@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import axios from 'axios';
 import { motion, AnimatePresence, useMotionValue, useTransform } from 'framer-motion';
+import { useInView } from 'react-intersection-observer';
 import './App.css';
 
 import Background from './components/Background';
@@ -12,6 +13,7 @@ import RainyDaysChart from './components/RainyDaysChart';
 import AnimatedCounter from './components/AnimatedCounter';
 import GlassCard from './components/GlassCard';
 import MagneticButton from './components/MagneticButton';
+import FeelRadial from './components/FeelRadial';
 
 const API_URL = 'http://127.0.0.1:8000';
 
@@ -27,6 +29,13 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const resultsRef = useRef(null);
+
+  /* ---- scroll-trigger containers ---- */
+  const [mapRef, mapInView] = useInView({ threshold: 0.3, triggerOnce: true });
+  const [controlsRef, controlsInView] = useInView({ threshold: 0.3, triggerOnce: true });
+  const [feelRef, feelInView] = useInView({ threshold: 0.3, triggerOnce: true });
+  const [metricsRef, metricsInView] = useInView({ threshold: 0.3, triggerOnce: true });
+  const [chartsRef, chartsInView] = useInView({ threshold: 0.2, triggerOnce: true });
 
   useEffect(() => {
     const t = setTimeout(() => setIsPageLoading(false), 2500);
@@ -47,6 +56,7 @@ function App() {
     setLat(latlng.lat);
     setLon(latlng.lng);
     getAddressFromCoords(latlng.lat, latlng.lng);
+    /* ---- zoom is NOT reset ---- */
   };
   const handleZoomChange = (z) => setZoom(z);
 
@@ -96,64 +106,96 @@ function App() {
         >
           <Background />
           <Hero />
-          <GlassCard className="map-card">
-            <Map
-              lat={lat}
-              lon={lon}
-              zoom={zoom}
-              onMapClick={handleMapClick}
-              onZoomChange={handleZoomChange}
-            />
-            <div className="location-bar">
-              <span className="pin">📍</span> {address}
-            </div>
-          </GlassCard>
 
-          <GlassCard className="controls-card">
-            <form onSubmit={handleSearch} className="search-line">
-              <input
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search for a place…"
+          <motion.div
+            ref={mapRef}
+            initial={{ opacity: 0, y: 60 }}
+            animate={mapInView ? { opacity: 1, y: 0 } : {}}
+            transition={{ duration: 0.8, ease: 'easeOut' }}
+          >
+            <GlassCard className="map-card">
+              <Map
+                lat={lat}
+                lon={lon}
+                zoom={zoom}
+                onMapClick={handleMapClick}
+                onZoomChange={handleZoomChange}
               />
-              <MagneticButton type="submit" disabled={loading}>Search</MagneticButton>
-            </form>
-            <div className="coord-line">
-              <input
-                type="number"
-                step="any"
-                value={lat}
-                onChange={(e) => setLat(e.target.value)}
-                onBlur={() => getAddressFromCoords(lat, lon)}
-                placeholder="Latitude"
-              />
-              <input
-                type="number"
-                step="any"
-                value={lon}
-                onChange={(e) => setLon(e.target.value)}
-                onBlur={() => getAddressFromCoords(lat, lon)}
-                placeholder="Longitude"
-              />
-            </div>
-            <div className="analysis-line">
-              <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
-              <MagneticButton onClick={handleAnalysis} disabled={loading}>
-                {loading ? 'Analysing…' : 'Analyse'}
-              </MagneticButton>
-              {results && (
-                <motion.button
-                  initial={{ width: 0, opacity: 0 }}
-                  animate={{ width: 'auto', opacity: 1 }}
-                  exit={{ width: 0, opacity: 0 }}
-                  onClick={handleClear}
-                  className="clear"
-                >
-                  Clear
-                </motion.button>
-              )}
-            </div>
-          </GlassCard>
+              <div className="location-bar">
+                <span className="pin">📍</span> {address}
+              </div>
+            </GlassCard>
+          </motion.div>
+
+          <motion.div
+            ref={controlsRef}
+            initial={{ opacity: 0, y: 60 }}
+            animate={controlsInView ? { opacity: 1, y: 0 } : {}}
+            transition={{ duration: 0.8, delay: 0.1, ease: 'easeOut' }}
+          >
+            <GlassCard className="controls-card">
+              <form onSubmit={handleSearch} className="search-line">
+                <input
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search for a place…"
+                />
+                <MagneticButton type="submit" disabled={loading}>Search</MagneticButton>
+              </form>
+              <div className="coord-line">
+                <input
+                  type="number"
+                  step="any"
+                  value={lat}
+                  onChange={(e) => setLat(e.target.value)}
+                  onBlur={() => getAddressFromCoords(lat, lon)}
+                  placeholder="Latitude"
+                />
+                <input
+                  type="number"
+                  step="any"
+                  value={lon}
+                  onChange={(e) => setLon(e.target.value)}
+                  onBlur={() => getAddressFromCoords(lat, lon)}
+                  placeholder="Longitude"
+                />
+              </div>
+              <div className="analysis-line">
+                <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+                <MagneticButton onClick={handleAnalysis} disabled={loading}>
+                  {loading ? 'Analysing…' : 'Analyse'}
+                </MagneticButton>
+                {results && (
+                  <motion.button
+                    initial={{ width: 0, opacity: 0 }}
+                    animate={{ width: 'auto', opacity: 1 }}
+                    exit={{ width: 0, opacity: 0 }}
+                    onClick={handleClear}
+                    className="clear"
+                  >
+                    Clear
+                  </motion.button>
+                )}
+              </div>
+            </GlassCard>
+          </motion.div>
+
+          <motion.div
+            ref={feelRef}
+            initial={{ opacity: 0, y: 60 }}
+            animate={feelInView ? { opacity: 1, y: 0 } : {}}
+            transition={{ duration: 0.8, delay: 0.2, ease: 'easeOut' }}
+            className="feel-section"
+          >
+            <GlassCard>
+              <h3>How does it feel right now?</h3>
+              <div className="feel-grid">
+                <FeelRadial label="Hot" value={78} color="#FF6B6B" />
+                <FeelRadial label="Cold" value={34} color="#4ECDC4" />
+                <FeelRadial label="Windy" value={62} color="#FFE66D" />
+              </div>
+            </GlassCard>
+          </motion.div>
 
           {error && <ErrorBanner msg={error} onDismiss={() => setError('')} />}
 
@@ -166,7 +208,13 @@ function App() {
                 exit={{ opacity: 0, y: 60 }}
                 className="results-area"
               >
-                <div className="metrics-grid">
+                <motion.div
+                  ref={metricsRef}
+                  initial={{ opacity: 0, y: 60 }}
+                  animate={metricsInView ? { opacity: 1, y: 0 } : {}}
+                  transition={{ duration: 0.8, ease: 'easeOut' }}
+                  className="metrics-grid"
+                >
                   <Metric
                     label="Rain Probability"
                     value={results.stats.ml_rain_probability}
@@ -186,9 +234,15 @@ function App() {
                     decimals={2}
                     delta={`${results.stats.precip_trend_per_year.toFixed(2)} mm / year`}
                   />
-                </div>
+                </motion.div>
 
-                <div className="charts-grid">
+                <motion.div
+                  ref={chartsRef}
+                  initial={{ opacity: 0, y: 60 }}
+                  animate={chartsInView ? { opacity: 1, y: 0 } : {}}
+                  transition={{ duration: 0.8, delay: 0.1, ease: 'easeOut' }}
+                  className="charts-grid"
+                >
                   <GlassCard>
                     <h4>Historical Temperature Trend (Max °C)</h4>
                     <div className="chart-box">
@@ -201,14 +255,20 @@ function App() {
                       <RainyDaysChart data={results.df} />
                     </div>
                   </GlassCard>
-                </div>
+                </motion.div>
 
-                <GlassCard style={{ marginTop: '2rem' }}>
-                  <h4>Historical Precipitation (Total mm)</h4>
-                  <div className="chart-box">
-                    <PrecipitationChart data={results.df} />
-                  </div>
-                </GlassCard>
+                <motion.div
+                  initial={{ opacity: 0, y: 60 }}
+                  animate={chartsInView ? { opacity: 1, y: 0 } : {}}
+                  transition={{ duration: 0.8, delay: 0.2, ease: 'easeOut' }}
+                >
+                  <GlassCard style={{ marginTop: '2rem' }}>
+                    <h4>Historical Precipitation (Total mm)</h4>
+                    <div className="chart-box">
+                      <PrecipitationChart data={results.df} />
+                    </div>
+                  </GlassCard>
+                </motion.div>
               </motion.div>
             )}
           </AnimatePresence>
@@ -259,29 +319,52 @@ function Hero() {
   const rotateX = useTransform(mouseY, [-150, 150], [10, -10]);
   const rotateY = useTransform(mouseX, [-150, 150], [-10, 10]);
 
+  /* ---- glitter letters ---- */
+  const letters = 'lluvia'.split('');
+  const subLetters = 'Will it rain on my parade?'.split('');
+
   return (
     <div className="hero" onMouseMove={onMouseMove}>
       <motion.div
         style={{ rotateX, rotateY }}
         className="hero-text"
       >
-        <motion.h1
-          initial={{ opacity: 0, y: -40 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, ease: 'easeOut' }}
-        >
-          lluvia
-        </motion.h1>
-        <motion.p
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2, duration: 0.8, ease: 'easeOut' }}
-        >
-          Will it rain on my parade?
-        </motion.p>
+        <motion.div className="hero-title">
+          {letters.map((ch, i) => (
+            <motion.span
+              key={i}
+              className="hero-letter"
+              initial={{ opacity: 0, y: 80 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: i * 0.08, type: 'spring', stiffness: 400 }}
+              whileHover={{
+                scale: 1.3,
+                rotate: 10,
+                color: '#fff',
+                textShadow: '0 0 20px #26F17F',
+              }}
+            >
+              {ch}
+            </motion.span>
+          ))}
+        </motion.div>
+        <motion.div className="hero-sub">
+          {subLetters.map((ch, i) => (
+            <motion.span
+              key={i}
+              className="hero-sub-letter"
+              initial={{ opacity: 0, y: 30 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.5 + i * 0.02, ease: 'easeOut' }}
+              whileHover={{ color: '#26F17F', scale: 1.1 }}
+            >
+              {ch === ' ' ? '\u00A0' : ch}
+            </motion.span>
+          ))}
+        </motion.div>
       </motion.div>
     </div>
   );
 }
 
-export default App;
+export default App; 
