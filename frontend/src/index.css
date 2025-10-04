@@ -1,19 +1,30 @@
-/* frontend/src/index.css */
-@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap');
-
+/* ---- living gradient + aurora ---- */
 body {
-    margin: 0;
-    font-family: 'Roboto', sans-serif;
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
-    background: linear-gradient(-45deg, #1E1E1E, #2A2A2A, #111111, #222222);
-    background-size: 400% 400%;
-    animation: gradientBG 15s ease infinite;
-    color: #FFFFFF;
+  margin: 0;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background: #0d0d0d;
+  color: #fff;
+  overflow-x: hidden;
+}
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -3;
+  background:
+    radial-gradient(ellipse at 70% 20%, #26f17f33 0%, transparent 50%),
+    radial-gradient(ellipse at 30% 80%, #00d4ff33 0%, transparent 50%);
+  animation: aurora 25s ease-in-out infinite alternate;
+}
+@keyframes aurora {
+  0%   { transform: rotate(0deg)   scale(1.2); }
+  100% { transform: rotate(360deg) scale(1.6); }
 }
 
-@keyframes gradientBG {
-    0% { background-position: 0% 50%; }
-    50% { background-position: 100% 50%; }
-    100% { background-position: 0% 50%; }
+/* ---- chart fix: prevent stretch ---- */
+.chart-box {
+  height: 320px !important;
+  width: 100% !important;
 }

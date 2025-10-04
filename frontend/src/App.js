@@ -1,26 +1,22 @@
-// frontend/src/App.js
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import axios from 'axios';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, useMotionValue, useTransform } from 'framer-motion';
 import './App.css';
+
+import Background from './components/Background';
+import Loader from './components/Loader';
 import Map from './components/Map';
 import TemperatureChart from './components/TemperatureChart';
 import PrecipitationChart from './components/PrecipitationChart';
 import RainyDaysChart from './components/RainyDaysChart';
-import AnimatedButton from './components/AnimatedButton';
 import AnimatedCounter from './components/AnimatedCounter';
-import Loader from './components/Loader';
-import Logo from './components/Logo';
-import Background from './components/Background'; // --- NEW: Import the background ---
+import GlassCard from './components/GlassCard';
+import MagneticButton from './components/MagneticButton';
 
 const API_URL = 'http://127.0.0.1:8000';
 
-const containerVariants = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.2 } } };
-const itemVariants = { hidden: { opacity: 0, y: 50 }, show: { opacity: 1, y: 0, transition: { duration: 0.8, ease: "easeOut" } } };
-
 function App() {
   const [isPageLoading, setIsPageLoading] = useState(true);
-  // ... (rest of state and functions are the same as before)
   const [date, setDate] = useState('2025-10-04');
   const [lat, setLat] = useState(10.8505);
   const [lon, setLon] = useState(76.2711);
@@ -33,17 +29,18 @@ function App() {
   const resultsRef = useRef(null);
 
   useEffect(() => {
-    const timer = setTimeout(() => setIsPageLoading(false), 2000);
-    return () => clearTimeout(timer);
+    const t = setTimeout(() => setIsPageLoading(false), 2500);
+    return () => clearTimeout(t);
   }, []);
 
-  const getAddressFromCoords = useCallback(async (newLat, newLon) => {
+  const getAddressFromCoords = useCallback(async (lt, ln) => {
     try {
-      const response = await axios.post(`${API_URL}/reverse_geocode`, { lat: newLat, lon: newLon });
-      setAddress(response.data.address);
-      const locationName = response.data.address.split(',')[0];
-      setSearchQuery(locationName);
-    } catch (err) { setAddress("Unknown Location"); }
+      const { data } = await axios.post(`${API_URL}/reverse_geocode`, { lat: lt, lon: ln });
+      setAddress(data.address);
+      setSearchQuery(data.address.split(',')[0]);
+    } catch {
+      setAddress('Unknown Location');
+    }
   }, []);
 
   const handleMapClick = (latlng) => {
@@ -51,111 +48,238 @@ function App() {
     setLon(latlng.lng);
     getAddressFromCoords(latlng.lat, latlng.lng);
   };
-  const handleZoomChange = (newZoom) => setZoom(newZoom);
+  const handleZoomChange = (z) => setZoom(z);
+
   const handleSearch = async (e) => {
     e.preventDefault();
-    if (!searchQuery) return;
+    if (!searchQuery.trim()) return;
     try {
-      const response = await axios.post(`${API_URL}/geocode`, { query: searchQuery });
-      setLat(response.data.lat);
-      setLon(response.data.lon);
-      setAddress(response.data.address);
+      const { data } = await axios.post(`${API_URL}/geocode`, { query: searchQuery });
+      setLat(data.lat);
+      setLon(data.lon);
+      setAddress(data.address);
       setZoom(13);
-    } catch (err) { setError("Location not found."); }
-  };
-  const handleAnalysis = async () => {
-    setLoading(true);
-    setError('');
-    setResults(null);
-    try {
-      const response = await axios.post(`${API_URL}/analyze`, { lat: parseFloat(lat), lon: parseFloat(lon), target_date: date });
-      setResults(response.data);
-      setTimeout(() => {
-        resultsRef.current?.scrollIntoView({ behavior: 'smooth' });
-      }, 500);
-    } catch (err) { setError(err.response ? err.response.data.detail : 'Failed to connect.'); }
-    setLoading(false);
-  };
-  const handleClearResults = () => {
-    setResults(null);
-    setError('');
+      setError('');
+    } catch {
+      setError('Location not found. Try another search.');
+    }
   };
 
+  const handleAnalysis = async () => {
+    setLoading(true); setError(''); setResults(null);
+    try {
+      const { data } = await axios.post(`${API_URL}/analyze`, {
+        lat: parseFloat(lat),
+        lon: parseFloat(lon),
+        target_date: date,
+      });
+      setResults(data);
+      setTimeout(() => resultsRef.current?.scrollIntoView({ behavior: 'smooth' }), 600);
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Backend connection failed.');
+    }
+    setLoading(false);
+  };
+
+  const handleClear = () => { setResults(null); setError(''); };
+
   return (
-    <> {/* Use a Fragment to wrap the app and background */}
-      <Background /> {/* --- NEW: Add the background component --- */}
-      <AnimatePresence>
-        {isPageLoading ? <Loader key="loader" /> : (
-          <motion.div key="main-app" className="App" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-            <header className="header">
-              <Logo text="lluvia" />
-              <p>Climate-Aware Historical Weather Analysis</p>
-            </header>
-            
-            {/* ... (rest of the App.js return statement is the same) ... */}
-            <Map lat={lat} lon={lon} zoom={zoom} onMapClick={handleMapClick} onZoomChange={handleZoomChange} />
-            <div className="location-info"><p><strong>Current Location:</strong> {address}</p></div>
-            <div className="controls">
-              <form className="search-form" onSubmit={handleSearch}>
-                <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search for a place..."/>
-                <AnimatedButton type="submit" disabled={loading}>Search</AnimatedButton>
-              </form>
-              <div className="coord-inputs">
-                <input type="number" step="any" value={lat} onChange={(e) => setLat(e.target.value)} onBlur={() => getAddressFromCoords(lat, lon)} placeholder="Latitude"/>
-                <input type="number" step="any" value={lon} onChange={(e) => setLon(e.target.value)} onBlur={() => getAddressFromCoords(lat, lon)} placeholder="Longitude"/>
-              </div>
-              <div className="analysis-controls">
-                <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
-                <AnimatedButton onClick={handleAnalysis} disabled={loading}>{loading ? 'Analyzing...' : `Analyze`}</AnimatedButton>
-                <AnimatePresence>
-                  {results && (
-                    <motion.div initial={{ opacity: 0, width: 0 }} animate={{ opacity: 1, width: 'auto' }} exit={{ opacity: 0, width: 0 }}>
-                      <AnimatedButton onClick={handleClearResults} className="clear-button">Clear</AnimatedButton>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
+    <AnimatePresence mode="wait">
+      {isPageLoading ? (
+        <Loader key="loader" />
+      ) : (
+        <motion.div
+          key="app"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="app-shell"
+        >
+          <Background />
+          <Hero />
+          <GlassCard className="map-card">
+            <Map
+              lat={lat}
+              lon={lon}
+              zoom={zoom}
+              onMapClick={handleMapClick}
+              onZoomChange={handleZoomChange}
+            />
+            <div className="location-bar">
+              <span className="pin">📍</span> {address}
             </div>
-            {error && <p style={{ color: 'red' }}>Error: {error}</p>}
-            <AnimatePresence>
+          </GlassCard>
+
+          <GlassCard className="controls-card">
+            <form onSubmit={handleSearch} className="search-line">
+              <input
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search for a place…"
+              />
+              <MagneticButton type="submit" disabled={loading}>Search</MagneticButton>
+            </form>
+            <div className="coord-line">
+              <input
+                type="number"
+                step="any"
+                value={lat}
+                onChange={(e) => setLat(e.target.value)}
+                onBlur={() => getAddressFromCoords(lat, lon)}
+                placeholder="Latitude"
+              />
+              <input
+                type="number"
+                step="any"
+                value={lon}
+                onChange={(e) => setLon(e.target.value)}
+                onBlur={() => getAddressFromCoords(lat, lon)}
+                placeholder="Longitude"
+              />
+            </div>
+            <div className="analysis-line">
+              <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+              <MagneticButton onClick={handleAnalysis} disabled={loading}>
+                {loading ? 'Analysing…' : 'Analyse'}
+              </MagneticButton>
               {results && (
-                <motion.div ref={resultsRef} variants={containerVariants} initial="hidden" animate="show" exit="hidden">
-                  <motion.div className="results-grid" variants={itemVariants}>
-                    <Metric label="Rain Probability" value={results.stats.ml_rain_probability} unit="%" helpText={results.stats.prediction_method}/>
-                    <Metric label="Trend-Adjusted Avg Temp" value={results.stats.projected_temp_max} unit="°C" delta={`${(results.stats.temp_trend_per_year * 10).toFixed(2)}°C / decade`}/>
-                    <Metric label="Trend-Adjusted Avg Precip" value={Math.max(0, results.stats.projected_precip)} unit=" mm" decimals={2} delta={`${results.stats.precip_trend_per_year.toFixed(2)} mm / year`}/>
-                  </motion.div>
-                  <motion.div className="charts-grid" variants={itemVariants}>
-                    <div className="chart-container">
-                      <h4>Historical Temperature Trend (Max °C)</h4>
+                <motion.button
+                  initial={{ width: 0, opacity: 0 }}
+                  animate={{ width: 'auto', opacity: 1 }}
+                  exit={{ width: 0, opacity: 0 }}
+                  onClick={handleClear}
+                  className="clear"
+                >
+                  Clear
+                </motion.button>
+              )}
+            </div>
+          </GlassCard>
+
+          {error && <ErrorBanner msg={error} onDismiss={() => setError('')} />}
+
+          <AnimatePresence>
+            {results && (
+              <motion.div
+                ref={resultsRef}
+                initial={{ opacity: 0, y: 60 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 60 }}
+                className="results-area"
+              >
+                <div className="metrics-grid">
+                  <Metric
+                    label="Rain Probability"
+                    value={results.stats.ml_rain_probability}
+                    unit="%"
+                    help={results.stats.prediction_method}
+                  />
+                  <Metric
+                    label="Trend-Adjusted Avg Temp"
+                    value={results.stats.projected_temp_max}
+                    unit="°C"
+                    delta={`${(results.stats.temp_trend_per_year * 10).toFixed(2)}°C / decade`}
+                  />
+                  <Metric
+                    label="Trend-Adjusted Avg Precip"
+                    value={Math.max(0, results.stats.projected_precip)}
+                    unit=" mm"
+                    decimals={2}
+                    delta={`${results.stats.precip_trend_per_year.toFixed(2)} mm / year`}
+                  />
+                </div>
+
+                <div className="charts-grid">
+                  <GlassCard>
+                    <h4>Historical Temperature Trend (Max °C)</h4>
+                    <div className="chart-box">
                       <TemperatureChart data={results.df} />
                     </div>
-                    <div className="chart-container">
-                      <h4>Rainy vs. Dry Day History</h4>
+                  </GlassCard>
+                  <GlassCard>
+                    <h4>Rainy vs Dry Days</h4>
+                    <div className="chart-box">
                       <RainyDaysChart data={results.df} />
                     </div>
-                  </motion.div>
-                  <motion.div className="chart-container" style={{marginTop: '2rem'}} variants={itemVariants}>
-                    <h4>Historical Precipitation (Total mm)</h4>
+                  </GlassCard>
+                </div>
+
+                <GlassCard style={{ marginTop: '2rem' }}>
+                  <h4>Historical Precipitation (Total mm)</h4>
+                  <div className="chart-box">
                     <PrecipitationChart data={results.df} />
-                  </motion.div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </>
+                  </div>
+                </GlassCard>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 }
 
-function Metric({ label, value, unit = "", decimals = 1, delta, helpText }) {
+function Metric({ label, value, unit, decimals = 1, delta, help }) {
   return (
     <div className="metric">
       <h3>{label}</h3>
-      <p><AnimatedCounter to={value} decimals={decimals} />{unit}</p>
+      <p>
+        <AnimatedCounter to={value} decimals={decimals} />
+        {unit}
+      </p>
       {delta && <span className="delta">{delta}</span>}
-      {helpText && <span className="delta" style={{fontSize: '0.8rem', display: 'block'}}>{helpText}</span>}
+      {help && <span className="help">{help}</span>}
+    </div>
+  );
+}
+
+function ErrorBanner({ msg, onDismiss }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: -20 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -20 }}
+      className="error-banner"
+    >
+      {msg}
+      <button onClick={onDismiss}>✕</button>
+    </motion.div>
+  );
+}
+
+function Hero() {
+  const mouseX = useMotionValue(0);
+  const mouseY = useMotionValue(0);
+
+  const onMouseMove = (e) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    mouseX.set(e.clientX - rect.left - rect.width / 2);
+    mouseY.set(e.clientY - rect.top - rect.height / 2);
+  };
+
+  const rotateX = useTransform(mouseY, [-150, 150], [10, -10]);
+  const rotateY = useTransform(mouseX, [-150, 150], [-10, 10]);
+
+  return (
+    <div className="hero" onMouseMove={onMouseMove}>
+      <motion.div
+        style={{ rotateX, rotateY }}
+        className="hero-text"
+      >
+        <motion.h1
+          initial={{ opacity: 0, y: -40 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.8, ease: 'easeOut' }}
+        >
+          lluvia
+        </motion.h1>
+        <motion.p
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2, duration: 0.8, ease: 'easeOut' }}
+        >
+          Will it rain on my parade?
+        </motion.p>
+      </motion.div>
     </div>
   );
 }

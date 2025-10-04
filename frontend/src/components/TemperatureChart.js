@@ -1,64 +1,63 @@
-// frontend/src/components/TemperatureChart.js
-import React from 'react';
 import { Line } from 'react-chartjs-2';
-import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend } from 'chart.js';
+import { Chart as ChartJS, registerables } from 'chart.js';
+ChartJS.register(...registerables);
 
-ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend);
-
-function TemperatureChart({ data }) {
-  // ... (data processing logic is the same)
-  const yearlyData = data.reduce((acc, curr) => {
-    const year = new Date(curr.time).getFullYear();
-    if (!acc[year]) { acc[year] = { temps: [], count: 0 }; }
-    acc[year].temps.push(curr.temperature_2m_max);
-    acc[year].count++;
-    return acc;
+export default function TemperatureChart({ data }) {
+  const yearly = data.reduce((a, c) => {
+    const y = new Date(c.time).getFullYear();
+    if (!a[y]) a[y] = { temps: 0, count: 0 };
+    a[y].temps += c.temperature_2m_max;
+    a[y].count += 1;
+    return a;
   }, {});
 
-  const labels = Object.keys(yearlyData);
-  const chartData = labels.map(year => {
-    const sum = yearlyData[year].temps.reduce((a, b) => a + b, 0);
-    return sum / yearlyData[year].count;
-  });
+  const labels = Object.keys(yearly);
+  const vals = labels.map((y) => yearly[y].temps / yearly[y].count);
 
-  const chartOptions = {
+  const opts = {
     responsive: true,
     maintainAspectRatio: false,
-    plugins: { 
+    plugins: {
       legend: { display: false },
       tooltip: {
-        backgroundColor: 'rgba(0, 30, 0, 0.9)',
-        titleColor: '#00ff88',
-        bodyColor: '#ffffff',
-        borderColor: '#00cc66',
+        backgroundColor: 'rgba(0,0,0,.8)',
+        titleColor: '#26F17F',
+        bodyColor: '#fff',
+        borderColor: '#26F17F',
         borderWidth: 1,
         cornerRadius: 8,
-        displayColors: false
-      }
+        displayColors: false,
+      },
     },
     scales: {
-      x: { ticks: { color: '#88cc88' }, grid: { color: 'rgba(0, 255, 136, 0.1)' } },
-      y: { ticks: { color: '#88cc88' }, grid: { color: 'rgba(0, 255, 136, 0.1)' } }
+      x: { ticks: { color: '#88cc88' }, grid: { color: 'rgba(0,255,136,.1)' } },
+      y: { ticks: { color: '#88cc88' }, grid: { color: 'rgba(0,255,136,.1)' } },
     },
-    animation: {
-      duration: 2000,
-      easing: 'easeInOutQuint',
-    },
+    animation: { duration: 1800, easing: 'easeOutQuart' },
+    onHover: (e, els) => { e.native.target.style.cursor = els[0] ? 'pointer' : 'default'; },
   };
 
-  const lineChartData = {
-    labels,
-    datasets: [{
-      label: 'Avg. Max Temp (°C)',
-      data: chartData,
-      borderColor: '#26F17F',
-      backgroundColor: 'rgba(38, 241, 127, 0.2)',
-      tension: 0.4, // Make the line smoother
-      fill: true
-    }]
-  };
-
-  return <Line options={chartOptions} data={lineChartData} />;
+  return (
+    <Line
+      data={{
+        labels,
+        datasets: [
+          {
+            label: 'Avg Max Temp °C',
+            data: vals,
+            borderColor: '#26F17F',
+            backgroundColor: 'rgba(38,241,127,.15)',
+            tension: 0.4,
+            fill: true,
+            pointRadius: 4,
+            pointHoverRadius: 6,
+            pointBackgroundColor: '#26F17F',
+            pointBorderColor: '#fff',
+            pointBorderWidth: 2,
+          },
+        ],
+      }}
+      options={opts}
+    />
+  );
 }
-
-export default TemperatureChart;

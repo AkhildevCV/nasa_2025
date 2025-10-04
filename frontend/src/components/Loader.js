@@ -1,25 +1,39 @@
-// frontend/src/components/Loader.js
-import React from 'react';
 import { motion } from 'framer-motion';
-import './Loader.css'; // We'll create this CSS file next
+import { useState, useEffect } from 'react';
+import './Loader.css';
 
-function Loader() {
+const texts = [
+  'Consulting the clouds…',
+  'Calibrating satellites…',
+  'Reading the skies…',
+  'Forecasting fate…',
+];
+
+export default function Loader() {
+  const [idx, setIdx] = useState(0);
+  useEffect(() => {
+    const t = setInterval(() => setIdx((i) => (i + 1) % texts.length), 1800);
+    return () => clearInterval(t);
+  }, []);
+
   return (
-    <motion.div 
-      className="loader-container"
-      initial={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      transition={{ duration: 0.5 }}
+    <motion.div
+      className="loader-wrapper"
+      exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.6 } }}
     >
-      <motion.h1
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 1, ease: "easeInOut", repeat: Infinity, repeatType: "reverse" }}
+      <motion.div
+        animate={{ rotate: 360 }}
+        transition={{ duration: 4, ease: 'linear', repeat: Infinity }}
+        className="loader-ring"
+      />
+      <motion.h2
+        key={idx}
+        initial={{ y: 20, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        exit={{ y: -20, opacity: 0 }}
       >
-        🌦 Loading Weather Data...
-      </motion.h1>
+        {texts[idx]}
+      </motion.h2>
     </motion.div>
   );
 }
-
-export default Loader;
