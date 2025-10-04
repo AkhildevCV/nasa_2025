@@ -19,11 +19,14 @@ const API_URL = 'http://127.0.0.1:8000';
 function App() {
   const [isPageLoading, setIsPageLoading] = useState(true);
   const [date, setDate] = useState('2025-10-04');
-  const [lat, setLat] = useState(10.8505);
-  const [lon, setLon] = useState(76.2711);
+
+  /* -----------  DEFAULT CENTRE – map visible immediately  ----------- */
+  const [lat, setLat] = useState(20.0);
+  const [lon, setLon] = useState(0.0);
+
   const [zoom, setZoom] = useState(10);
-  const [address, setAddress] = useState('Pallur, Kerala, India');
-  const [searchQuery, setSearchQuery] = useState('Pallur, Kerala');
+  const [address, setAddress] = useState(null);
+  const [searchQuery, setSearchQuery] = useState(null);
   const [results, setResults] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -40,15 +43,11 @@ function App() {
     return () => clearTimeout(t);
   }, []);
 
-  // ✨ UPDATED: This function is now the callback for the auto-scroll
-  // It will be triggered by the Hero component itself.
   const handleHeroAnimationComplete = useCallback(() => {
-    // A small delay for a smoother visual transition before scrolling
     setTimeout(() => {
-        mainContentRef.current?.scrollIntoView({ behavior: 'smooth' });
+      mainContentRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, 250);
   }, []);
-
 
   const getAddressFromCoords = useCallback(async (lt, ln) => {
     try {
@@ -69,7 +68,7 @@ function App() {
 
   const handleSearch = async (e) => {
     e.preventDefault();
-    if (!searchQuery.trim()) return;
+    if (!searchQuery?.trim()) return;
     try {
       const { data } = await axios.post(`${API_URL}/geocode`, { query: searchQuery });
       setLat(data.lat);
@@ -83,7 +82,9 @@ function App() {
   };
 
   const handleAnalysis = async () => {
-    setLoading(true); setError(''); setResults(null);
+    setLoading(true);
+    setError('');
+    setResults(null);
     try {
       const { data } = await axios.post(`${API_URL}/analyze`, {
         lat: parseFloat(lat),
@@ -98,7 +99,14 @@ function App() {
     setLoading(false);
   };
 
-  const handleClear = () => { setResults(null); setError(''); };
+  const handleClear = () => {
+    setResults(null);
+    setError('');
+  };
+
+  /* ------------------------------------------------------------------ */
+  /* ---------------------------  RENDER  ----------------------------- */
+  /* ------------------------------------------------------------------ */
 
   return (
     <AnimatePresence mode="wait">
@@ -111,7 +119,6 @@ function App() {
           animate={{ opacity: 1 }}
           className="app-shell"
         >
-          {/* ✨ UPDATED: Pass the callback function as a prop to Hero */}
           <Hero onAnimationComplete={handleHeroAnimationComplete} />
 
           <div ref={mainContentRef} className="main-content">
@@ -130,7 +137,7 @@ function App() {
                   onZoomChange={handleZoomChange}
                 />
                 <div className="location-bar">
-                  <span className="pin">📍</span> {address}
+                  <span className="pin">📍</span> {address ?? 'Unknown location'}
                 </div>
               </GlassCard>
             </motion.div>
@@ -144,11 +151,13 @@ function App() {
               <GlassCard className="controls-card">
                 <form onSubmit={handleSearch} className="search-line">
                   <input
-                    value={searchQuery}
+                    value={searchQuery ?? ''}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     placeholder="Search for a place…"
                   />
-                  <MagneticButton type="submit" disabled={loading}>Search</MagneticButton>
+                  <MagneticButton type="submit" disabled={loading}>
+                    Search
+                  </MagneticButton>
                 </form>
                 <div className="coord-line">
                   <input
@@ -270,6 +279,10 @@ function App() {
   );
 }
 
+/* ------------------------------------------------------------------ */
+/* ----------------------------  METRIC  ---------------------------- */
+/* ------------------------------------------------------------------ */
+
 function Metric({ label, value, unit, decimals = 1, delta, help }) {
   return (
     <div className="metric">
@@ -283,6 +296,10 @@ function Metric({ label, value, unit, decimals = 1, delta, help }) {
     </div>
   );
 }
+
+/* ------------------------------------------------------------------ */
+/* --------------------------  ERROR BANNER  ------------------------ */
+/* ------------------------------------------------------------------ */
 
 function ErrorBanner({ msg, onDismiss }) {
   return (
