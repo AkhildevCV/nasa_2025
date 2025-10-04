@@ -7,4 +7,6 @@ scikit-learn
 requests
 python-dotenv
 fastapi-cors
-geopy 
+geopy
+ephem
+openaq

@@ -145,7 +145,96 @@ def analyze_location_weather(lat: float, lon: float, target_date: date):
 
 
 # --- API Endpoints ---
+# ----------  NEW ROUTES  ----------
+from fastapi import Query
+from datetime import timedelta
+import ephem
+import math
 
+@app.get("/sun-moon")
+def sun_moon(
+    lat: float = Query(...),
+    lon: float = Query(...),
+    date: str = Query(...)
+):
+    """Return sunrise, sunset, moonrise, moonset and moon-phase % for given lat/lon/date."""
+    try:
+        d = datetime.strptime(date, "%Y-%m-%d")
+        obs = ephem.Observer()
+        obs.lat, obs.lon = str(lat), str(lon)
+        obs.date = d.date()
+
+        sun = ephem.Sun()
+        sun.compute(obs)
+        sunrise  = obs.previous_rising(sun).datetime().strftime("%H:%M")
+        sunset   = obs.next_setting(sun).datetime().strftime("%H:%M")
+
+        moon = ephem.Moon()
+        moon.compute(obs)
+        moonrise = obs.previous_rising(moon).datetime().strftime("%H:%M") \
+                 if obs.previous_rising(moon).datetime().date() == d.date() else None
+        moonset  = obs.next_setting(moon).datetime().strftime("%H:%M") \
+                 if obs.next_setting(moon).datetime().date() == d.date() else None
+
+        next_new  = ephem.previous_new_moon(obs.date)
+        next_full = ephem.previous_full_moon(obs.date)
+        phase = (obs.date - next_new) / (next_full - next_new)
+        phase_pct = round(phase * 100, 1)
+
+        return {"sunrise": sunrise, "sunset": sunset,
+                "moonrise": moonrise, "moonset": moonset,
+                "moon_phase_percent": phase_pct}
+    except Exception as e:
+        raise HTTPException(500, f"Sun/Moon error: {e}")
+
+
+@app.get("/air-quality")
+def air_quality(
+    lat: float = Query(...),
+    lon: float = Query(...)
+):
+    """Return current AQI, PM2.5, PM10, O3 via OpenAQ."""
+    try:
+        url = "https://api.openaq.org/v2/latest"
+        params = {"coordinates": f"{lat},{lon}", "radius": 25000, "limit": 1}
+        r = requests.get(url, params=params, timeout=10)
+        r.raise_for_status()
+        data = r.json()["results"]
+        if not data:
+            return {"aqi": None, "pm25": None, "pm10": None, "o3": None}
+        m = data[0]["measurements"]
+        out = {"aqi": None, "pm25": None, "pm10": None, "o3": None}
+        for meas in m:
+            if meas["parameter"] == "pm25": out["pm25"] = meas["value"]
+            if meas["parameter"] == "pm10": out["pm10"] = meas["value"]
+            if meas["parameter"] == "o3":    out["o3"]    = meas["value"]
+            if meas["parameter"] == "aqi":   out["aqi"]   = meas["value"]
+        return out
+    except Exception as e:
+        raise HTTPException(500, f"Air-quality error: {e}")
+
+
+@app.get("/soil")
+def soil(
+    lat: float = Query(...),
+    lon: float = Query(...)
+):
+    """Return 0-5 cm soil data (clay, sand, silt, organic carbon %) from SoilGrids."""
+    try:
+        url = "https://rest.isric.org/soilgrids/v2.0/properties/query"
+        params = {"lat": lat, "lon": lon, "property": ["clay", "sand", "silt", "ocd"],
+                  "depth": "0-5cm", "value": "mean"}
+        r = requests.get(url, params=params, timeout=15)
+        r.raise_for_status()
+        data = r.json()["properties"]
+        out = {}
+        for prop in ["clay", "sand", "silt", "ocd"]:
+            layer = data[prop]["layers"][0]
+            out[prop] = round(layer["depths"][0]["values"]["mean"], 2)
+        return out
+    except Exception as e:
+        raise HTTPException(500, f"Soil error: {e}")
+    
 @app.post("/geocode")
 async def handle_geocode_request(request: GeocodeRequest):
     try:
