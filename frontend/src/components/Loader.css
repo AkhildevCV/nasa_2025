@@ -1,0 +1,19 @@
+/* frontend/src/components/Loader.css */
+.loader-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background-color: #1E1E1E;
+  z-index: 9999;
+}
+
+.loader-container h1 {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #26F17F;
+}

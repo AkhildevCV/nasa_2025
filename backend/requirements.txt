@@ -1,0 +1,10 @@
+# backend/requirements.txt
+fastapi
+uvicorn[standard]
+pandas
+numpy
+scikit-learn
+requests
+python-dotenv
+fastapi-cors
+geopy 
