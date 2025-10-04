@@ -13,7 +13,6 @@ import RainyDaysChart from './components/RainyDaysChart';
 import AnimatedCounter from './components/AnimatedCounter';
 import GlassCard from './components/GlassCard';
 import MagneticButton from './components/MagneticButton';
-import FeelRadial from './components/FeelRadial';
 
 const API_URL = 'http://127.0.0.1:8000';
 
@@ -33,10 +32,8 @@ function App() {
   /* ---- scroll-trigger containers ---- */
   const [mapRef, mapInView] = useInView({ threshold: 0.3, triggerOnce: true });
   const [controlsRef, controlsInView] = useInView({ threshold: 0.3, triggerOnce: true });
-  const [feelRef, feelInView] = useInView({ threshold: 0.3, triggerOnce: true });
   const [metricsRef, metricsInView] = useInView({ threshold: 0.3, triggerOnce: true });
   const [chartsRef, chartsInView] = useInView({ threshold: 0.2, triggerOnce: true });
-
   useEffect(() => {
     const t = setTimeout(() => setIsPageLoading(false), 2500);
     return () => clearTimeout(t);
@@ -180,7 +177,7 @@ function App() {
             </GlassCard>
           </motion.div>
 
-          <motion.div
+          {/* <motion.div
             ref={feelRef}
             initial={{ opacity: 0, y: 60 }}
             animate={feelInView ? { opacity: 1, y: 0 } : {}}
@@ -195,7 +192,7 @@ function App() {
                 <FeelRadial label="Windy" value={62} color="#FFE66D" />
               </div>
             </GlassCard>
-          </motion.div>
+          </motion.div> */}
 
           {error && <ErrorBanner msg={error} onDismiss={() => setError('')} />}
 
