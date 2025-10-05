@@ -14,6 +14,7 @@ import HourlyWeatherChart from './components/HourlyWeatherChart';
 import AnimatedCounter from './components/AnimatedCounter';
 import GlassCard from './components/GlassCard';
 import MagneticButton from './components/MagneticButton';
+import InteractiveWeatherBackground from './components/Background';
 
 const API_URL = 'http://127.0.0.1:8000';
 
@@ -126,6 +127,16 @@ function App() {
           animate={{ opacity: 1 }}
           className="app-shell"
         >
+          {/* Interactive Weather Background */}
+          <InteractiveWeatherBackground 
+            rainProbability={results?.stats?.ml_rain_probability}
+            temperature={results?.stats?.projected_temp_max}
+            precipitation={results?.stats?.projected_precip}
+            season={results?.season}
+            hourlyData={results?.hourly_data}
+            autoMode={true}
+          />
+
           <Hero onAnimationComplete={handleHeroAnimationComplete} />
 
           <div ref={mainContentRef} className="main-content">
