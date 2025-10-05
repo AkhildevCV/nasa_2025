@@ -2,13 +2,14 @@
 import uvicorn
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 import pandas as pd
 import numpy as np
 import requests
 from sklearn.preprocessing import StandardScaler
-from sklearn.ensemble import RandomForestClassifier
+from sklearn.ensemble import RandomForestClassifier, GradientBoostingRegressor
 from sklearn.model_selection import cross_val_score
+from sklearn.multioutput import MultiOutputRegressor
 from fastapi.middleware.cors import CORSMiddleware
 import warnings
 from geopy.geocoders import Nominatim
@@ -51,7 +52,7 @@ geocode_service = RateLimiter(geolocator.geocode, min_delay_seconds=1)
 reverse_geocode_service = RateLimiter(geolocator.reverse, min_delay_seconds=1)
 
 # ------------------------------------------------------------------
-# 4.  LOCAL ALIAS TABLE  (instant fix for Pallur)
+# 4.  LOCAL ALIAS TABLE
 # ------------------------------------------------------------------
 LOCAL_ALIAS = {
     "pallur"        : (10.8505, 76.2711, "Pallur, Kerala, India"),
@@ -59,7 +60,7 @@ LOCAL_ALIAS = {
 }
 
 # ------------------------------------------------------------------
-# 5.  NASA-POWER  helpers  (unchanged)
+# 5.  NASA-POWER  helpers  (unchanged for daily stats)
 # ------------------------------------------------------------------
 def fetch_nasa_power_data(lat: float, lon: float, target_day_of_year: int):
     start_year, end_year = 2005, 2024
@@ -105,6 +106,272 @@ def fetch_nasa_power_data(lat: float, lon: float, target_day_of_year: int):
         filtered_df["rain_binary"] = (filtered_df["precipitation_sum"].fillna(0) >= 1.0).astype(int)
         return filtered_df.reset_index(drop=True)
     except Exception:
+        return None
+
+# ------------------------------------------------------------------
+# 5B. PREDICTIVE HOURLY MODEL using historical same-date patterns
+# ------------------------------------------------------------------
+def determine_season(month: int, lat: float):
+    """Determine season based on month and hemisphere"""
+    # Northern hemisphere
+    if lat >= 0:
+        if month in [12, 1, 2]:
+            return "Winter"
+        elif month in [3, 4, 5]:
+            return "Spring"
+        elif month in [6, 7, 8]:
+            return "Summer"
+        else:
+            return "Autumn"
+    # Southern hemisphere (reversed)
+    else:
+        if month in [12, 1, 2]:
+            return "Summer"
+        elif month in [3, 4, 5]:
+            return "Autumn"
+        elif month in [6, 7, 8]:
+            return "Winter"
+        else:
+            return "Spring"
+
+def fetch_historical_hourly_data(lat: float, lon: float, target_date: date, years_back: int = 20):
+    """
+    Fetch hourly data for the same date across previous years.
+    Returns DataFrame with year, hour, and weather variables.
+    """
+    try:
+        all_data = []
+        today = date.today()
+        
+        # Fetch data for the same date in previous years
+        for year_offset in range(1, years_back + 1):
+            historical_year = target_date.year - year_offset
+            
+            # Skip if year is too old (Open-Meteo archive starts from 1940)
+            if historical_year < 1940:
+                continue
+            
+            historical_date = date(historical_year, target_date.month, target_date.day)
+            
+            # Skip if this historical date is in the future (hasn't happened yet)
+            if historical_date > today:
+                continue
+            
+            # Fetch from Open-Meteo Archive API
+            url = "https://archive-api.open-meteo.com/v1/archive"
+            params = {
+                "latitude": lat,
+                "longitude": lon,
+                "start_date": historical_date.strftime("%Y-%m-%d"),
+                "end_date": historical_date.strftime("%Y-%m-%d"),
+                "hourly": "temperature_2m,relative_humidity_2m,precipitation,wind_speed_10m,surface_pressure,cloud_cover",
+                "timezone": "auto"
+            }
+            
+            response = requests.get(url, params=params, timeout=30)
+            if response.status_code != 200:
+                continue
+                
+            data = response.json()
+            if "hourly" not in data:
+                continue
+                
+            hourly = data["hourly"]
+            df = pd.DataFrame({
+                "datetime": pd.to_datetime(hourly["time"]),
+                "year": historical_year,
+                "temperature": hourly["temperature_2m"],
+                "humidity": hourly["relative_humidity_2m"],
+                "precipitation": hourly["precipitation"],
+                "wind_speed": hourly["wind_speed_10m"],
+                "pressure": hourly["surface_pressure"],
+                "cloud_cover": hourly["cloud_cover"]
+            })
+            
+            df["hour"] = df["datetime"].dt.hour
+            df["year_offset"] = year_offset  # For weighting
+            
+            all_data.append(df)
+        
+        if not all_data:
+            return None
+            
+        # Combine all years
+        combined_df = pd.concat(all_data, ignore_index=True)
+        return combined_df
+        
+    except Exception as e:
+        print(f"Error fetching historical hourly data: {e}")
+        return None
+
+def train_hourly_prediction_model(historical_df: pd.DataFrame):
+    """
+    Train Gradient Boosting model to predict hourly weather variables.
+    Uses exponential decay weighting for recent years.
+    """
+    try:
+        # Calculate exponential decay weights
+        # weight = 0.9^(year_offset)
+        historical_df["weight"] = 0.9 ** historical_df["year_offset"]
+        
+        # Create features
+        features = pd.DataFrame({
+            "hour": historical_df["hour"],
+            "year": historical_df["year"],
+            "day_of_year": historical_df["datetime"].dt.dayofyear,
+            "sin_hour": np.sin(2 * np.pi * historical_df["hour"] / 24),
+            "cos_hour": np.cos(2 * np.pi * historical_df["hour"] / 24),
+            "sin_doy": np.sin(2 * np.pi * historical_df["datetime"].dt.dayofyear / 366),
+            "cos_doy": np.cos(2 * np.pi * historical_df["datetime"].dt.dayofyear / 366),
+        })
+        
+        # Target variables to predict
+        targets = historical_df[["temperature", "humidity", "precipitation", "wind_speed", "pressure", "cloud_cover"]]
+        
+        # Remove rows with missing values
+        valid_mask = ~(features.isna().any(axis=1) | targets.isna().any(axis=1))
+        features = features[valid_mask]
+        targets = targets[valid_mask]
+        weights = historical_df.loc[valid_mask, "weight"]
+        
+        if len(features) < 50:
+            return None, None
+        
+        # Scale features
+        scaler = StandardScaler()
+        features_scaled = scaler.fit_transform(features)
+        
+        # Train multi-output Gradient Boosting model
+        model = MultiOutputRegressor(
+            GradientBoostingRegressor(
+                n_estimators=100,
+                max_depth=5,
+                learning_rate=0.1,
+                random_state=42
+            )
+        )
+        
+        model.fit(features_scaled, targets, sample_weight=weights)
+        
+        return model, scaler
+        
+    except Exception as e:
+        print(f"Error training hourly model: {e}")
+        return None, None
+
+def predict_future_hourly(lat: float, lon: float, target_date: date):
+    """
+    Predict hourly weather for a future date using historical patterns.
+    """
+    try:
+        # Fetch historical data for the same date in previous years
+        historical_df = fetch_historical_hourly_data(lat, lon, target_date, years_back=20)
+        
+        if historical_df is None or len(historical_df) < 50:
+            return None
+        
+        # Train the model
+        model, scaler = train_hourly_prediction_model(historical_df)
+        
+        if model is None or scaler is None:
+            return None
+        
+        # Create prediction features for each hour of target date
+        hours = list(range(24))
+        prediction_features = pd.DataFrame({
+            "hour": hours,
+            "year": [target_date.year] * 24,
+            "day_of_year": [target_date.timetuple().tm_yday] * 24,
+            "sin_hour": [np.sin(2 * np.pi * h / 24) for h in hours],
+            "cos_hour": [np.cos(2 * np.pi * h / 24) for h in hours],
+            "sin_doy": [np.sin(2 * np.pi * target_date.timetuple().tm_yday / 366)] * 24,
+            "cos_doy": [np.cos(2 * np.pi * target_date.timetuple().tm_yday / 366)] * 24,
+        })
+        
+        # Scale and predict
+        prediction_features_scaled = scaler.transform(prediction_features)
+        predictions = model.predict(prediction_features_scaled)
+        
+        # Format results
+        hourly_data = []
+        for i, hour in enumerate(hours):
+            hourly_data.append({
+                "hour": hour,
+                "time": f"{target_date.strftime('%Y-%m-%d')} {hour:02d}:00",
+                "temperature": round(float(predictions[i][0]), 1),
+                "humidity": round(float(predictions[i][1]), 1),
+                "precipitation": max(0, round(float(predictions[i][2]), 2)),
+                "wind_speed": max(0, round(float(predictions[i][3]), 1)),
+                "pressure": round(float(predictions[i][4]), 1),
+                "cloud_cover": max(0, min(100, round(float(predictions[i][5])))),
+                "predicted": True
+            })
+        
+        # Determine season
+        season = determine_season(target_date.month, lat)
+        
+        return {
+            "hourly_data": hourly_data,
+            "season": season,
+            "prediction_method": "ML (Gradient Boosting with Exponential Decay)",
+            "years_used": len(historical_df["year"].unique())
+        }
+        
+    except Exception as e:
+        print(f"Error predicting hourly weather: {e}")
+        return None
+
+def fetch_actual_hourly_data(lat: float, lon: float, target_date: date):
+    """
+    Fetch actual historical hourly data for past dates.
+    """
+    try:
+        url = "https://archive-api.open-meteo.com/v1/archive"
+        params = {
+            "latitude": lat,
+            "longitude": lon,
+            "start_date": target_date.strftime("%Y-%m-%d"),
+            "end_date": target_date.strftime("%Y-%m-%d"),
+            "hourly": "temperature_2m,relative_humidity_2m,precipitation,wind_speed_10m,surface_pressure,cloud_cover",
+            "timezone": "auto"
+        }
+        
+        response = requests.get(url, params=params, timeout=30)
+        if response.status_code != 200:
+            return None
+            
+        data = response.json()
+        if "hourly" not in data:
+            return None
+            
+        hourly = data["hourly"]
+        hourly_data = []
+        
+        for i in range(len(hourly["time"])):
+            dt = pd.to_datetime(hourly["time"][i])
+            hourly_data.append({
+                "hour": dt.hour,
+                "time": dt.strftime("%Y-%m-%d %H:%M"),
+                "temperature": round(hourly["temperature_2m"][i], 1) if hourly["temperature_2m"][i] is not None else None,
+                "humidity": round(hourly["relative_humidity_2m"][i], 1) if hourly["relative_humidity_2m"][i] is not None else None,
+                "precipitation": round(hourly["precipitation"][i], 2) if hourly["precipitation"][i] is not None else 0,
+                "wind_speed": round(hourly["wind_speed_10m"][i], 1) if hourly["wind_speed_10m"][i] is not None else None,
+                "pressure": round(hourly["surface_pressure"][i], 1) if hourly["surface_pressure"][i] is not None else None,
+                "cloud_cover": int(hourly["cloud_cover"][i]) if hourly["cloud_cover"][i] is not None else None,
+                "predicted": False
+            })
+        
+        season = determine_season(target_date.month, lat)
+        
+        return {
+            "hourly_data": hourly_data,
+            "season": season,
+            "prediction_method": "Historical Data",
+            "years_used": 1
+        }
+        
+    except Exception as e:
+        print(f"Error fetching actual hourly data: {e}")
         return None
 
 def create_features(df: pd.DataFrame):
@@ -164,11 +431,15 @@ def calculate_weather_statistics(df: pd.DataFrame, target_date: date):
     return stats
 
 def analyze_location_weather(lat: float, lon: float, target_date: date):
+    # Fetch NASA POWER daily data (for long-term trends and ML)
     df = fetch_nasa_power_data(lat, lon, target_date.timetuple().tm_yday)
     if df is None:
         return {"error": "Insufficient data from NASA. This could be an ocean area or a temporary API issue."}
+    
+    # Calculate daily statistics
     stats = calculate_weather_statistics(df, target_date)
     model, scaler, cv_score = train_model(df)
+    
     if model:
         stats["model_accuracy"] = cv_score * 100
         future_row = df.iloc[[-1]].copy()
@@ -182,13 +453,41 @@ def analyze_location_weather(lat: float, lon: float, target_date: date):
             stats.update({"ml_rain_probability": stats["prob_rain"], "prediction_method": "Historical Frequency"})
     else:
         stats.update({"ml_rain_probability": stats["prob_rain"], "prediction_method": "Historical Frequency"})
+    
+    # Determine if date is past or future
+    today = date.today()
+    
+    if target_date <= today:
+        # Past date - fetch actual historical data
+        hourly_result = fetch_actual_hourly_data(lat, lon, target_date)
+    else:
+        # Future date - use predictive model
+        hourly_result = predict_future_hourly(lat, lon, target_date)
+    
+    # Prepare daily historical data for response
     df_json = df.to_dict(orient="records")
     for row in df_json:
         row["time"] = row["time"].isoformat()
-    return {"error": None, "lat": lat, "lon": lon, "df": df_json, "stats": stats, "total_years": df["year"].nunique()}
+    
+    response = {
+        "error": None,
+        "lat": lat,
+        "lon": lon,
+        "df": df_json,
+        "stats": stats,
+        "total_years": df["year"].nunique()
+    }
+    
+    if hourly_result:
+        response.update(hourly_result)
+    else:
+        response["hourly_data"] = None
+        response["season"] = determine_season(target_date.month, lat)
+    
+    return response
 
 # ------------------------------------------------------------------
-# 6.  Extra utility endpoints  (unchanged)
+# 6.  Extra utility endpoints
 # ------------------------------------------------------------------
 from fastapi import Query
 import ephem
@@ -272,16 +571,14 @@ def soil(lat: float = Query(...), lon: float = Query(...)):
         raise HTTPException(500, f"Soil error: {e}")
 
 # ------------------------------------------------------------------
-# 7.  Geocoding endpoints  (Pallur fix inside /geocode)
+# 7.  Geocoding endpoints
 # ------------------------------------------------------------------
 @app.post("/geocode")
 async def handle_geocode_request(request: GeocodeRequest):
     q = request.query.strip().lower()
-    # 1.  instant local alias
     if q in LOCAL_ALIAS:
         lat, lon, addr = LOCAL_ALIAS[q]
         return {"lat": lat, "lon": lon, "address": addr}
-    # 2.  fall back to Nominatim
     try:
         location = geocode_service(request.query, exactly_one=True, timeout=10)
         if location:
