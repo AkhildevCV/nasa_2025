@@ -19,7 +19,6 @@ export default function InteractiveWeatherBackground({
 
     /* 2.  Utility */
     const rand = (min, max) => Math.random() * (max - min) + min;
-    const abs = Math.abs;
 
     /* 3.  Decide weather-mode from season (backend string) */
     let weatherMode = 'windy';       // default
