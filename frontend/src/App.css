@@ -232,6 +232,76 @@
   margin-left: 0.5rem;
 }
 
+/* ---- VIEW TOGGLE STYLES ---- */
+.view-toggle-container {
+  margin-bottom: 2rem;
+}
+
+.view-toggle-card {
+  padding: 1rem;
+}
+
+.toggle-hint {
+  margin: 1rem 0 0;
+  text-align: center;
+  font-size: 0.85rem;
+  color: #aaa;
+}
+
+.toggle-wrapper {
+  position: relative;
+  display: flex;
+  gap: 0.5rem;
+  background: rgba(0, 0, 0, 0.3);
+  padding: 0.4rem;
+  border-radius: 16px;
+}
+
+.toggle-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 1rem 1.5rem;
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  background: transparent;
+  color: #fff;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  position: relative;
+  z-index: 2;
+}
+
+.toggle-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.toggle-btn.active {
+  color: #000;
+  border-color: #26f17f;
+}
+
+.toggle-icon {
+  font-size: 1.2rem;
+}
+
+.toggle-slider {
+  position: absolute;
+  top: 0.4rem;
+  left: 0.4rem;
+  width: calc(50% - 0.6rem);
+  height: calc(100% - 0.8rem);
+  background: linear-gradient(135deg, #26f17f, #00d9ff);
+  border-radius: 12px;
+  z-index: 1;
+  box-shadow: 0 4px 20px rgba(38, 241, 127, 0.4);
+}
+
 /* ---- metrics ---- */
 .metrics-grid {
   display: grid;
@@ -301,6 +371,253 @@
   position: relative;
 }
 
+/* ---- HOURLY WEATHER STYLES ---- */
+.hourly-weather-container {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.info-banner {
+  padding: 1.5rem;
+  background: linear-gradient(135deg, rgba(38, 241, 127, 0.1), rgba(0, 217, 255, 0.1));
+}
+
+.info-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1.5rem;
+}
+
+.info-item {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.info-icon {
+  font-size: 2rem;
+}
+
+.info-label {
+  font-size: 0.8rem;
+  color: #aaa;
+  margin-bottom: 0.25rem;
+}
+
+.info-value {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #26f17f;
+}
+
+.prediction-badge {
+  margin-top: 1rem;
+  padding: 0.75rem 1rem;
+  background: rgba(38, 241, 127, 0.1);
+  border: 1px solid rgba(38, 241, 127, 0.3);
+  border-radius: 8px;
+  text-align: center;
+  font-size: 0.9rem;
+  color: #26f17f;
+  font-weight: 500;
+}
+
+.metric-selector-card {
+  padding: 1.5rem;
+}
+
+.selector-title {
+  margin: 0 0 1.5rem;
+  font-size: 1.2rem;
+  font-weight: 600;
+  text-align: center;
+  color: #26f17f;
+}
+
+.metric-buttons {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 1rem;
+}
+
+.metric-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 1.2rem 1rem;
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.03);
+  color: #fff;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.metric-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  transform: translateY(-2px);
+}
+
+.metric-btn.active {
+  background: rgba(255, 255, 255, 0.1);
+  box-shadow: 0 0 20px currentColor;
+}
+
+.metric-icon {
+  font-size: 2rem;
+}
+
+.metric-name {
+  text-align: center;
+}
+
+.hourly-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1.5rem;
+}
+
+.stat-card {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  padding: 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  transition: all 0.3s ease;
+  cursor: pointer;
+}
+
+.stat-icon {
+  font-size: 2.5rem;
+}
+
+.stat-content {
+  flex: 1;
+}
+
+.stat-label {
+  font-size: 0.85rem;
+  color: #aaa;
+  margin-bottom: 0.5rem;
+}
+
+.stat-value {
+  font-size: 2rem;
+  font-weight: 700;
+  display: flex;
+  align-items: baseline;
+  gap: 0.3rem;
+}
+
+.stat-unit {
+  font-size: 1rem;
+  opacity: 0.7;
+}
+
+.hourly-chart-card {
+  padding: 1.5rem;
+}
+
+.chart-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.chart-header h4 {
+  margin: 0;
+  font-size: 1.2rem;
+  font-weight: 600;
+}
+
+.chart-date {
+  font-size: 0.9rem;
+  color: #26f17f;
+  font-weight: 500;
+}
+
+.hourly-chart-box {
+  height: 400px;
+  width: 100%;
+  position: relative;
+}
+
+.hourly-details-card {
+  padding: 1.5rem;
+}
+
+.hourly-details-card h4 {
+  margin: 0 0 1.5rem;
+  font-size: 1.2rem;
+  font-weight: 600;
+}
+
+.hourly-details-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 1rem;
+}
+
+.hour-detail-item {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 1rem;
+  transition: all 0.3s ease;
+}
+
+.hour-time {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #26f17f;
+  margin-bottom: 0.75rem;
+}
+
+.hour-metrics {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.hour-metric {
+  font-size: 0.85rem;
+  color: #ccc;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.no-hourly-data {
+  text-align: center;
+  padding: 3rem 2rem;
+}
+
+.no-hourly-data .icon {
+  font-size: 4rem;
+  display: block;
+  margin-bottom: 1rem;
+}
+
+.no-hourly-data h3 {
+  font-size: 1.5rem;
+  margin: 0 0 0.5rem;
+  color: #26f17f;
+}
+
+.no-hourly-data p {
+  color: #aaa;
+  font-size: 1rem;
+}
+
 /* ---- error ---- */
 .error-banner {
   background: #ff5555;
@@ -352,6 +669,23 @@ button:active::after {
 
 @media (max-width: 900px) {
   .charts-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .toggle-btn {
+    padding: 0.8rem 1rem;
+    font-size: 0.9rem;
+  }
+  
+  .toggle-icon {
+    font-size: 1rem;
+  }
+  
+  .metric-buttons {
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  }
+  
+  .hourly-details-grid {
     grid-template-columns: 1fr;
   }
 }

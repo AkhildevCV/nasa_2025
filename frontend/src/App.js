@@ -10,6 +10,7 @@ import Map from './components/Map';
 import TemperatureChart from './components/TemperatureChart';
 import PrecipitationChart from './components/PrecipitationChart';
 import RainyDaysChart from './components/RainyDaysChart';
+import HourlyWeatherChart from './components/HourlyWeatherChart';
 import AnimatedCounter from './components/AnimatedCounter';
 import GlassCard from './components/GlassCard';
 import MagneticButton from './components/MagneticButton';
@@ -19,6 +20,7 @@ const API_URL = 'http://127.0.0.1:8000';
 function App() {
   const [isPageLoading, setIsPageLoading] = useState(true);
   const [date, setDate] = useState('2025-10-04');
+  const [viewMode, setViewMode] = useState('daily'); // 'daily' or 'hourly'
 
   /* -----------  DEFAULT CENTRE – map visible immediately  ----------- */
   const [lat, setLat] = useState(20.0);
@@ -92,6 +94,7 @@ function App() {
         target_date: date,
       });
       setResults(data);
+      console.log('Analysis results:', data); // Debug log
       setTimeout(() => resultsRef.current?.scrollIntoView({ behavior: 'smooth' }), 600);
     } catch (err) {
       setError(err.response?.data?.detail || 'Backend connection failed.');
@@ -102,7 +105,11 @@ function App() {
   const handleClear = () => {
     setResults(null);
     setError('');
+    setViewMode('daily');
   };
+
+  // Check if hourly data is available and valid
+  const hasHourlyData = results?.hourly_data && Array.isArray(results.hourly_data) && results.hourly_data.length > 0;
 
   /* ------------------------------------------------------------------ */
   /* ---------------------------  RENDER  ----------------------------- */
@@ -208,67 +215,147 @@ function App() {
                   exit={{ opacity: 0, y: 60 }}
                   className="results-area"
                 >
+                  {/* VIEW MODE TOGGLE */}
                   <motion.div
-                    ref={metricsRef}
-                    initial={{ opacity: 0, y: 60 }}
-                    animate={metricsInView ? { opacity: 1, y: 0 } : {}}
-                    transition={{ duration: 0.8, ease: 'easeOut' }}
-                    className="metrics-grid"
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ delay: 0.2 }}
+                    className="view-toggle-container"
                   >
-                    <Metric
-                      label="Rain Probability"
-                      value={results.stats.ml_rain_probability}
-                      unit="%"
-                      help={results.stats.prediction_method}
-                    />
-                    <Metric
-                      label="Trend-Adjusted Avg Temp"
-                      value={results.stats.projected_temp_max}
-                      unit="°C"
-                      delta={`${(results.stats.temp_trend_per_year * 10).toFixed(2)}°C / decade`}
-                    />
-                    <Metric
-                      label="Trend-Adjusted Avg Precip"
-                      value={Math.max(0, results.stats.projected_precip)}
-                      unit=" mm"
-                      decimals={2}
-                      delta={`${results.stats.precip_trend_per_year.toFixed(2)} mm / year`}
-                    />
-                  </motion.div>
-
-                  <motion.div
-                    ref={chartsRef}
-                    initial={{ opacity: 0, y: 60 }}
-                    animate={chartsInView ? { opacity: 1, y: 0 } : {}}
-                    transition={{ duration: 0.8, delay: 0.1, ease: 'easeOut' }}
-                    className="charts-grid"
-                  >
-                    <GlassCard>
-                      <h4>Historical Temperature Trend (Max °C)</h4>
-                      <div className="chart-box">
-                        <TemperatureChart data={results.df} />
+                    <GlassCard className="view-toggle-card">
+                      <div className="toggle-wrapper">
+                        <button
+                          className={`toggle-btn ${viewMode === 'daily' ? 'active' : ''}`}
+                          onClick={() => setViewMode('daily')}
+                        >
+                          <span className="toggle-icon">📊</span>
+                          Daily Stats
+                        </button>
+                        <button
+                          className={`toggle-btn ${viewMode === 'hourly' ? 'active' : ''}`}
+                          onClick={() => setViewMode('hourly')}
+                          disabled={!hasHourlyData}
+                          title={!hasHourlyData ? 'Hourly data not available for this date' : ''}
+                        >
+                          <span className="toggle-icon">⏰</span>
+                          Hourly Breakdown
+                        </button>
+                        <motion.div
+                          className="toggle-slider"
+                          animate={{
+                            x: viewMode === 'hourly' ? '100%' : '0%'
+                          }}
+                          transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+                        />
                       </div>
-                    </GlassCard>
-                    <GlassCard>
-                      <h4>Rainy vs Dry Days</h4>
-                      <div className="chart-box">
-                        <RainyDaysChart data={results.df} />
-                      </div>
+                      {!hasHourlyData && (
+                        <p className="toggle-hint">
+                          ℹ️ Hourly data available for dates from 1940 onwards
+                        </p>
+                      )}
                     </GlassCard>
                   </motion.div>
 
-                  <motion.div
-                    initial={{ opacity: 0, y: 60 }}
-                    animate={chartsInView ? { opacity: 1, y: 0 } : {}}
-                    transition={{ duration: 0.8, delay: 0.2, ease: 'easeOut' }}
-                  >
-                    <GlassCard style={{ marginTop: '2rem' }}>
-                      <h4>Historical Precipitation (Total mm)</h4>
-                      <div className="chart-box">
-                        <PrecipitationChart data={results.df} />
-                      </div>
-                    </GlassCard>
-                  </motion.div>
+                  {/* ANIMATED CONTENT SWITCH */}
+                  <AnimatePresence mode="wait">
+                    {viewMode === 'daily' ? (
+                      <motion.div
+                        key="daily-view"
+                        initial={{ opacity: 0, x: -50 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        exit={{ opacity: 0, x: 50 }}
+                        transition={{ duration: 0.5, ease: 'easeInOut' }}
+                      >
+                        <motion.div
+                          ref={metricsRef}
+                          initial={{ opacity: 0, y: 60 }}
+                          animate={metricsInView ? { opacity: 1, y: 0 } : {}}
+                          transition={{ duration: 0.8, ease: 'easeOut' }}
+                          className="metrics-grid"
+                        >
+                          <Metric
+                            label="Rain Probability"
+                            value={results.stats.ml_rain_probability}
+                            unit="%"
+                            help={results.stats.prediction_method}
+                          />
+                          <Metric
+                            label="Trend-Adjusted Avg Temp"
+                            value={results.stats.projected_temp_max}
+                            unit="°C"
+                            delta={`${(results.stats.temp_trend_per_year * 10).toFixed(2)}°C / decade`}
+                          />
+                          <Metric
+                            label="Trend-Adjusted Avg Precip"
+                            value={Math.max(0, results.stats.projected_precip)}
+                            unit=" mm"
+                            decimals={2}
+                            delta={`${results.stats.precip_trend_per_year.toFixed(2)} mm / year`}
+                          />
+                        </motion.div>
+
+                        <motion.div
+                          ref={chartsRef}
+                          initial={{ opacity: 0, y: 60 }}
+                          animate={chartsInView ? { opacity: 1, y: 0 } : {}}
+                          transition={{ duration: 0.8, delay: 0.1, ease: 'easeOut' }}
+                          className="charts-grid"
+                        >
+                          <GlassCard>
+                            <h4>Historical Temperature Trend (Max °C)</h4>
+                            <div className="chart-box">
+                              <TemperatureChart data={results.df} />
+                            </div>
+                          </GlassCard>
+                          <GlassCard>
+                            <h4>Rainy vs Dry Days</h4>
+                            <div className="chart-box">
+                              <RainyDaysChart data={results.df} />
+                            </div>
+                          </GlassCard>
+                        </motion.div>
+
+                        <motion.div
+                          initial={{ opacity: 0, y: 60 }}
+                          animate={chartsInView ? { opacity: 1, y: 0 } : {}}
+                          transition={{ duration: 0.8, delay: 0.2, ease: 'easeOut' }}
+                        >
+                          <GlassCard style={{ marginTop: '2rem' }}>
+                            <h4>Historical Precipitation (Total mm)</h4>
+                            <div className="chart-box">
+                              <PrecipitationChart data={results.df} />
+                            </div>
+                          </GlassCard>
+                        </motion.div>
+                      </motion.div>
+                    ) : (
+                      <motion.div
+                        key="hourly-view"
+                        initial={{ opacity: 0, x: 50 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        exit={{ opacity: 0, x: -50 }}
+                        transition={{ duration: 0.5, ease: 'easeInOut' }}
+                      >
+                        {hasHourlyData ? (
+                          <HourlyWeatherChart 
+                            data={results.hourly_data} 
+                            targetDate={date}
+                            season={results.season}
+                            predictionMethod={results.prediction_method}
+                            yearsUsed={results.years_used}
+                          />
+                        ) : (
+                          <GlassCard>
+                            <div className="no-hourly-data">
+                              <span className="icon">⚠️</span>
+                              <h3>Hourly Data Unavailable</h3>
+                              <p>Historical hourly data is only available for dates from 1940 to present.</p>
+                            </div>
+                          </GlassCard>
+                        )}
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </motion.div>
               )}
             </AnimatePresence>
