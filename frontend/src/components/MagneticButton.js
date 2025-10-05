@@ -1,4 +1,4 @@
-import { motion, useMotionValue, useTransform } from 'framer-motion';
+import { motion, useMotionValue } from 'framer-motion';
 
 export default function MagneticButton({ children, ...props }) {
   const x = useMotionValue(0);

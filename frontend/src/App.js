@@ -16,7 +16,7 @@ import GlassCard from './components/GlassCard';
 import MagneticButton from './components/MagneticButton';
 import InteractiveWeatherBackground from './components/Background';
 
-const API_URL = 'http://127.0.0.1:8000';
+const API_URL = 'https://nasa-2025-emsu.onrender.com/';
 
 /* ================================================================== */
 /* APP COMPONENT                                                      */
