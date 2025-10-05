@@ -49,7 +49,7 @@ function App() {
   const handleHeroAnimationComplete = useCallback(() => {
     setTimeout(() => {
       mainContentRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, 250);
+    }, 1500);
   }, []);
 
   const getAddressFromCoords = useCallback(async (lt, ln) => {
