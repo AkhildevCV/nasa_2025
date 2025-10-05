@@ -1,413 +1,333 @@
 import { useEffect, useRef } from 'react';
 
-export default function InteractiveWeatherBackground({ 
-  rainProbability = null, 
-  temperature = null,
-  precipitation = null,
-  season = null,
-  hourlyData = null
+export default function InteractiveWeatherBackground({
+  rainProbability = null,
+  temperature     = null,
+  precipitation   = null,
+  season          = null,
+  hourlyData      = null
 }) {
   const canvasRef = useRef(null);
 
   useEffect(() => {
-    // Don't render anything if no analysis data is available
+    /* 1.  No analysis yet → nothing to draw */
     if (rainProbability === null) return;
 
     const canvas = canvasRef.current;
     if (!canvas) return;
-
     const ctx = canvas.getContext('2d');
-    let animationId;
-    let time = 0;
-    let mouseX = 0;
-    let mouseY = 0;
-    
-    // Determine weather mode and intensity ONLY based on season
-    let weatherMode = 'windy';
-    let intensity = 30;
 
-    // Season takes absolute priority
-    if (season === 'Summer') {
+    /* 2.  Utility */
+    const rand = (min, max) => Math.random() * (max - min) + min;
+    const abs = Math.abs;
+
+    /* 3.  Decide weather-mode from season (backend string) */
+    let weatherMode = 'windy';       // default
+    let intensity   = 30;            // particle-count multiplier
+
+    const S = (season || '').toLowerCase();
+
+    /* ----------  WINTER BLOCK – no rain allowed  ---------- */
+    if (S.includes('winter') || S.includes('polar')) {
+      weatherMode = (temperature !== null && temperature < 5) ? 'snow' : 'fog';
+      intensity   = weatherMode === 'snow' ? 45 : 35;
+    }
+    /* ------------------------------------------------------- */
+    else if (S.includes('summer') || S.includes('midnight')) {
       weatherMode = 'clear';
-      intensity = 25;
-    } else if (season === 'Autumn') {
+      intensity   = 25;
+    }
+    else if (S.includes('autumn') || S.includes('fall')) {
       weatherMode = 'leaves';
-      intensity = 40;
-    } else if (season === 'Winter') {
-      if (temperature !== null && temperature < 5) {
-        weatherMode = 'snow';
-        intensity = 45;
-      } else {
-        weatherMode = 'fog';
-        intensity = 35;
-      }
-    } else if (season === 'Spring') {
-      // For spring, use rain probability to vary between gentle rain and windy
-      if (rainProbability > 50) {
-        weatherMode = 'rain';
-        intensity = 40;
-      } else {
-        weatherMode = 'windy';
-        intensity = 30;
-      }
-    } else {
-      // Fallback if no season is provided
+      intensity   = 40;
+    }
+    else if (S.includes('spring')) {
+      weatherMode = (rainProbability > 50) ? 'rain' : 'windy';
+      intensity   = weatherMode === 'rain' ? 40 : 30;
+    }
+    else if (S.includes('monsoon') || S.includes('wet')) {
+      weatherMode = 'rain';
+      intensity   = 45;
+    }
+    else if (S.includes('dry') || S.includes('post-monsoon') || S.includes('hot')) {
       weatherMode = 'windy';
-      intensity = 30;
+      intensity   = 30;
     }
 
+    /* 4.  Setup canvas */
     const resize = () => {
-      canvas.width = window.innerWidth;
+      canvas.width  = window.innerWidth;
       canvas.height = window.innerHeight;
     };
     resize();
     window.addEventListener('resize', resize);
 
+    /* 5.  Particle pools */
+    let animationId, time = 0, mouseX = 0, mouseY = 0;
     const lightningStrikes = [];
-    const particles = [];
-    const numParticles = Math.floor(intensity * 4);
-    const windParticles = [];
-    const numWindParticles = 30;
-    const fogParticles = [];
-    const numFogParticles = 40;
-    const sunRays = [];
-    const numSunRays = 12;
+    const particles        = [];
+    const windParticles    = [];
+    const fogParticles     = [];
+    const sunRays          = [];
 
-    const initParticles = () => {
+    const numParticles     = Math.floor(intensity * 4);
+    const numWind          = 30;
+    const numFog           = 40;
+    const numSun           = 12;
+
+    /* 6.  Init helpers */
+    function initParticles() {
       particles.length = 0;
-      // Only create particles for weather modes that need them
-      if (weatherMode === 'clear' || weatherMode === 'windy') {
-        return; // No particles for clear/windy weather
-      }
-      
+      if (weatherMode === 'clear' || weatherMode === 'windy') return;
+
       for (let i = 0; i < numParticles; i++) {
         if (weatherMode === 'snow') {
           particles.push({
-            x: Math.random() * canvas.width,
-            y: Math.random() * canvas.height - canvas.height,
-            radius: Math.random() * 3 + 2,
-            speed: Math.random() * 1 + 0.5,
-            drift: Math.random() * 2 - 1,
-            opacity: Math.random() * 0.6 + 0.4
+            x: rand(0, canvas.width),
+            y: rand(-canvas.height, 0),
+            r: rand(2, 5),
+            sp: rand(0.5, 1.5),
+            drift: rand(-1, 1),
+            o: rand(0.4, 1)
           });
         } else if (weatherMode === 'leaves') {
           particles.push({
-            x: Math.random() * canvas.width,
-            y: Math.random() * canvas.height - canvas.height,
-            radius: Math.random() * 4 + 3,
-            speed: Math.random() * 2 + 1,
-            drift: Math.random() * 3 - 1.5,
-            rotation: Math.random() * Math.PI * 2,
-            rotationSpeed: (Math.random() - 0.5) * 0.1,
-            opacity: Math.random() * 0.6 + 0.4,
-            color: ['#ff8c42', '#ffa62b', '#c1512f', '#8b4513', '#d4a574'][Math.floor(Math.random() * 5)]
+            x: rand(0, canvas.width),
+            y: rand(-canvas.height, 0),
+            r: rand(3, 7),
+            sp: rand(1, 3),
+            drift: rand(-1.5, 1.5),
+            rot: rand(0, Math.PI * 2),
+            rotSp: rand(-0.05, 0.05),
+            o: rand(0.4, 1),
+            color: ['#ff8c42','#ffa62b','#c1512f','#8b4513','#d4a574'][Math.floor(rand(0,5))]
           });
-        } else if (weatherMode === 'rain' || weatherMode === 'storm' || weatherMode === 'fog') {
+        } 
+        // ✨ FIX #1: Changed `else` to `else if` to be specific about rain
+        else if (weatherMode === 'rain' || weatherMode === 'storm') {
           particles.push({
-            x: Math.random() * canvas.width,
-            y: Math.random() * canvas.height - canvas.height,
-            length: Math.random() * 25 + 15,
-            speed: Math.random() * 4 + 6,
-            opacity: Math.random() * 0.2 + 0.15
+            x: rand(0, canvas.width),
+            y: rand(-canvas.height, 0),
+            len: rand(15, 40),
+            sp:  rand(6, 10),
+            o:   rand(0.15, 0.3)
           });
         }
       }
-    };
-
-    for (let i = 0; i < numWindParticles; i++) {
-      windParticles.push({
-        x: Math.random() * canvas.width,
-        y: Math.random() * canvas.height,
-        speedX: Math.random() * 3 + 2,
-        speedY: (Math.random() - 0.5) * 0.5,
-        length: Math.random() * 40 + 20,
-        opacity: Math.random() * 0.1 + 0.05
-      });
     }
 
-    for (let i = 0; i < numFogParticles; i++) {
-      fogParticles.push({
-        x: Math.random() * canvas.width,
-        y: Math.random() * canvas.height,
-        radius: Math.random() * 150 + 100,
-        speedX: (Math.random() - 0.5) * 0.3,
-        speedY: (Math.random() - 0.5) * 0.2,
-        opacity: Math.random() * 0.15 + 0.05
-      });
-    }
+    for (let i = 0; i < numWind; i++) windParticles.push({
+      x: rand(0, canvas.width),
+      y: rand(0, canvas.height),
+      len: rand(20, 60),
+      sx: rand(2, 5),
+      sy: rand(-0.5, 0.5),
+      o: rand(0.05, 0.15)
+    });
 
-    for (let i = 0; i < numSunRays; i++) {
-      sunRays.push({
-        angle: (Math.PI * 2 * i) / numSunRays,
-        length: Math.random() * 100 + 150,
-        opacity: Math.random() * 0.1 + 0.05
-      });
-    }
+    for (let i = 0; i < numFog; i++) fogParticles.push({
+      x: rand(0, canvas.width),
+      y: rand(0, canvas.height),
+      r: rand(100, 250),
+      sx: rand(-0.3, 0.3),
+      sy: rand(-0.2, 0.2),
+      o: rand(0.05, 0.2)
+    });
+
+    for (let i = 0; i < numSun; i++) sunRays.push({
+      angle: (Math.PI * 2 * i) / numSun,
+      len: rand(150, 250),
+      o: rand(0.05, 0.1)
+    });
 
     initParticles();
 
-    const handleMouseMove = (e) => {
-      mouseX = e.clientX;
-      mouseY = e.clientY;
-    };
-    window.addEventListener('mousemove', handleMouseMove);
+    /* 7.  Mouse & lightning */
+    const handleMove = e => { mouseX = e.clientX; mouseY = e.clientY; };
+    window.addEventListener('mousemove', handleMove);
 
-    const handleClick = (e) => {
-      if (weatherMode === 'storm') {
-        createLightning(e.clientX, e.clientY);
-      }
-    };
-    canvas.addEventListener('click', handleClick);
-
-    const createLightning = (x, y) => {
+    function createLightning(x, y) {
       const branches = [];
-      const mainBranch = {
-        points: [{ x, y: 0 }],
-        x: x,
-        y: 0
-      };
-
-      let currentY = 0;
-      let currentX = x;
-      while (currentY < y) {
-        currentY += Math.random() * 60 + 40;
-        currentX += (Math.random() - 0.5) * 80;
-        mainBranch.points.push({ x: currentX, y: currentY });
+      const main = { points: [{ x, y: 0 }], x, y: 0 };
+      let cy = 0, cx = x;
+      while (cy < y) {
+        cy += rand(40, 80);
+        cx += rand(-80, 80);
+        main.points.push({ x: cx, y: cy });
       }
-
-      branches.push(mainBranch);
-
-      for (let i = 1; i < mainBranch.points.length - 1; i++) {
+      branches.push(main);
+      for (let i = 1; i < main.points.length - 1; i++) {
         if (Math.random() > 0.6) {
-          const branchPoint = mainBranch.points[i];
-          const sideBranch = {
-            points: [{ x: branchPoint.x, y: branchPoint.y }],
-            x: branchPoint.x,
-            y: branchPoint.y
-          };
-          
-          let bx = branchPoint.x;
-          let by = branchPoint.y;
+          const bp = main.points[i];
+          const side = { points: [{ x: bp.x, y: bp.y }], x: bp.x, y: bp.y };
+          let bx = bp.x, by = bp.y;
           const dir = Math.random() > 0.5 ? 1 : -1;
-          
           for (let j = 0; j < 3; j++) {
-            by += Math.random() * 40 + 20;
-            bx += dir * (Math.random() * 50 + 30);
-            sideBranch.points.push({ x: bx, y: by });
+            by += rand(20, 40);
+            bx += dir * rand(30, 60);
+            side.points.push({ x: bx, y: by });
           }
-          branches.push(sideBranch);
+          branches.push(side);
         }
       }
+      lightningStrikes.push({ branches, opacity: 1, createdAt: time });
+    }
 
-      lightningStrikes.push({
-        branches,
-        opacity: 1,
-        createdAt: time
-      });
-    };
+    const handleClick = e => { if (weatherMode === 'storm') createLightning(e.clientX, e.clientY); };
+    canvas.addEventListener('click', handleClick);
 
-    const animate = () => {
+    /* 8.  Animation loop */
+    function animate() {
       time++;
-      
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      // Draw summer sun rays
+      /* 8a. Sun (summer) */
       if (weatherMode === 'clear') {
         const sunX = canvas.width - 150;
         const sunY = 150;
-        
         sunRays.forEach(ray => {
-          const endX = sunX + Math.cos(ray.angle + time * 0.005) * ray.length;
-          const endY = sunY + Math.sin(ray.angle + time * 0.005) * ray.length;
-          
-          const gradient = ctx.createLinearGradient(sunX, sunY, endX, endY);
-          gradient.addColorStop(0, `rgba(255, 220, 100, ${ray.opacity})`);
-          gradient.addColorStop(1, 'rgba(255, 220, 100, 0)');
-          
-          ctx.strokeStyle = gradient;
+          const endX = sunX + Math.cos(ray.angle + time * 0.005) * ray.len;
+          const endY = sunY + Math.sin(ray.angle + time * 0.005) * ray.len;
+          const grad = ctx.createLinearGradient(sunX, sunY, endX, endY);
+          grad.addColorStop(0, `rgba(255,220,100,${ray.o})`);
+          grad.addColorStop(1, 'rgba(255,220,100,0)');
+          ctx.strokeStyle = grad;
           ctx.lineWidth = 15;
           ctx.beginPath();
           ctx.moveTo(sunX, sunY);
           ctx.lineTo(endX, endY);
           ctx.stroke();
         });
-
-        // Draw sun glow
-        const sunGradient = ctx.createRadialGradient(sunX, sunY, 30, sunX, sunY, 80);
-        sunGradient.addColorStop(0, 'rgba(255, 240, 150, 0.15)');
-        sunGradient.addColorStop(1, 'rgba(255, 240, 150, 0)');
-        ctx.fillStyle = sunGradient;
+        const glow = ctx.createRadialGradient(sunX, sunY, 30, sunX, sunY, 80);
+        glow.addColorStop(0, 'rgba(255,240,150,0.15)');
+        glow.addColorStop(1, 'rgba(255,240,150,0)');
+        ctx.fillStyle = glow;
         ctx.beginPath();
         ctx.arc(sunX, sunY, 80, 0, Math.PI * 2);
         ctx.fill();
       }
 
-      // Draw fog layer
+      /* 8b. Fog */
       if (weatherMode === 'fog' || weatherMode === 'rain') {
-        fogParticles.forEach(fog => {
-          const gradient = ctx.createRadialGradient(
-            fog.x, fog.y, 0,
-            fog.x, fog.y, fog.radius
-          );
-          const opacity = weatherMode === 'fog' ? fog.opacity * 2 : fog.opacity;
-          gradient.addColorStop(0, `rgba(200, 200, 200, ${opacity})`);
-          gradient.addColorStop(0.5, `rgba(180, 180, 180, ${opacity * 0.5})`);
-          gradient.addColorStop(1, 'rgba(180, 180, 180, 0)');
-          
-          ctx.fillStyle = gradient;
+        fogParticles.forEach(f => {
+          const grad = ctx.createRadialGradient(f.x, f.y, 0, f.x, f.y, f.r);
+          grad.addColorStop(0, `rgba(200,200,200,${f.o * (weatherMode === 'fog' ? 2 : 1)})`);
+          grad.addColorStop(1, 'rgba(180,180,180,0)');
+          ctx.fillStyle = grad;
           ctx.beginPath();
-          ctx.arc(fog.x, fog.y, fog.radius, 0, Math.PI * 2);
+          ctx.arc(f.x, f.y, f.r, 0, Math.PI * 2);
           ctx.fill();
-
-          fog.x += fog.speedX + Math.sin(time * 0.01) * 0.1;
-          fog.y += fog.speedY + Math.cos(time * 0.01) * 0.1;
-
-          if (fog.x < -fog.radius) fog.x = canvas.width + fog.radius;
-          if (fog.x > canvas.width + fog.radius) fog.x = -fog.radius;
-          if (fog.y < -fog.radius) fog.y = canvas.height + fog.radius;
-          if (fog.y > canvas.height + fog.radius) fog.y = -fog.radius;
+          f.x += f.sx + Math.sin(time * 0.01) * 0.1;
+          f.y += f.sy + Math.cos(time * 0.01) * 0.1;
+          if (f.x < -f.r) f.x = canvas.width + f.r;
+          if (f.x > canvas.width + f.r) f.x = -f.r;
+          if (f.y < -f.r) f.y = canvas.height + f.r;
+          if (f.y > canvas.height + f.r) f.y = -f.r;
         });
       }
 
-      // Draw wind effect
+      /* 8c. Wind */
       if (weatherMode === 'windy' || weatherMode === 'storm' || weatherMode === 'clear') {
-        windParticles.forEach(wind => {
-          const distToMouse = Math.hypot(wind.x - mouseX, wind.y - mouseY);
-          const pushForce = Math.max(0, 1 - distToMouse / 300);
-          
-          ctx.strokeStyle = `rgba(255, 255, 255, ${wind.opacity})`;
+        windParticles.forEach(w => {
+          const dist = Math.hypot(w.x - mouseX, w.y - mouseY);
+          const push = Math.max(0, 1 - dist / 300);
+          ctx.strokeStyle = `rgba(255,255,255,${w.o})`;
           ctx.lineWidth = 1.5;
           ctx.beginPath();
-          ctx.moveTo(wind.x, wind.y);
-          ctx.lineTo(wind.x - wind.length, wind.y);
+          ctx.moveTo(w.x, w.y);
+          ctx.lineTo(w.x - w.len, w.y);
           ctx.stroke();
-
-          wind.x += wind.speedX + pushForce * 5;
-          wind.y += wind.speedY + (mouseY - wind.y) * pushForce * 0.02;
-
-          if (wind.x > canvas.width) {
-            wind.x = 0;
-            wind.y = Math.random() * canvas.height;
-          }
+          w.x += w.sx + push * 5;
+          w.y += w.sy + (mouseY - w.y) * push * 0.02;
+          if (w.x > canvas.width) { w.x = 0; w.y = rand(0, canvas.height); }
         });
       }
 
-      // Draw precipitation/particles
+      /* 8d. Particles (snow / leaves / rain) */
       particles.forEach(p => {
         if (weatherMode === 'snow') {
-          ctx.fillStyle = `rgba(255, 255, 255, ${p.opacity})`;
+          ctx.fillStyle = `rgba(255,255,255,${p.o})`;
           ctx.beginPath();
-          ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+          ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
           ctx.fill();
-
-          p.y += p.speed;
+          p.y += p.sp;
           p.x += p.drift + Math.sin(time * 0.02 + p.y * 0.01) * 0.5;
-
-          if (p.y > canvas.height) {
-            p.y = -10;
-            p.x = Math.random() * canvas.width;
-          }
+          if (p.y > canvas.height) { p.y = -10; p.x = rand(0, canvas.width); }
         } else if (weatherMode === 'leaves') {
           ctx.save();
           ctx.translate(p.x, p.y);
-          ctx.rotate(p.rotation);
-          
+          ctx.rotate(p.rot);
           ctx.fillStyle = p.color;
-          ctx.globalAlpha = p.opacity;
-          
-          // Draw leaf shape
+          ctx.globalAlpha = p.o;
           ctx.beginPath();
-          ctx.moveTo(0, -p.radius);
-          ctx.quadraticCurveTo(p.radius, -p.radius / 2, p.radius / 2, 0);
-          ctx.quadraticCurveTo(p.radius, p.radius / 2, 0, p.radius);
-          ctx.quadraticCurveTo(-p.radius, p.radius / 2, -p.radius / 2, 0);
-          ctx.quadraticCurveTo(-p.radius, -p.radius / 2, 0, -p.radius);
+          ctx.moveTo(0, -p.r);
+          ctx.quadraticCurveTo(p.r, -p.r / 2, p.r / 2, 0);
+          ctx.quadraticCurveTo(p.r, p.r / 2, 0, p.r);
+          ctx.quadraticCurveTo(-p.r, p.r / 2, -p.r / 2, 0);
+          ctx.quadraticCurveTo(-p.r, -p.r / 2, 0, -p.r);
           ctx.fill();
-          
           ctx.globalAlpha = 1;
           ctx.restore();
-
-          p.y += p.speed;
+          p.y += p.sp;
           p.x += p.drift + Math.sin(time * 0.02 + p.y * 0.01) * 0.8;
-          p.rotation += p.rotationSpeed;
-
+          p.rot += p.rotSp;
           if (p.y > canvas.height) {
-            p.y = -10;
-            p.x = Math.random() * canvas.width;
-            p.rotation = Math.random() * Math.PI * 2;
+            p.y = -10; p.x = rand(0, canvas.width); p.rot = rand(0, Math.PI * 2);
           }
-        } else {
-          const gradient = ctx.createLinearGradient(p.x, p.y, p.x, p.y + p.length);
-          const baseOpacity = weatherMode === 'storm' ? p.opacity * 1.5 : p.opacity;
-          gradient.addColorStop(0, `rgba(255, 255, 255, ${baseOpacity})`);
-          gradient.addColorStop(1, `rgba(255, 255, 255, 0)`);
-          
-          ctx.strokeStyle = gradient;
+        } 
+        // ✨ FIX #2: Changed `else` to `else if` to match the fix above
+        else if (weatherMode === 'rain' || weatherMode === 'storm') {
+          const grad = ctx.createLinearGradient(p.x, p.y, p.x, p.y + p.len);
+          grad.addColorStop(0, `rgba(255,255,255,${p.o * (weatherMode === 'storm' ? 1.5 : 1)})`);
+          grad.addColorStop(1, 'rgba(255,255,255,0)');
+          ctx.strokeStyle = grad;
           ctx.lineWidth = 2;
           ctx.beginPath();
           ctx.moveTo(p.x, p.y);
-          ctx.lineTo(p.x, p.y + p.length);
+          ctx.lineTo(p.x, p.y + p.len);
           ctx.stroke();
-
-          p.y += p.speed;
-
-          if (p.y > canvas.height) {
-            p.y = -p.length;
-            p.x = Math.random() * canvas.width;
-          }
+          p.y += p.sp;
+          if (p.y > canvas.height) { p.y = -p.len; p.x = rand(0, canvas.width); }
         }
       });
 
-      // Draw lightning strikes
+      /* 8e. Lightning */
       lightningStrikes.forEach((strike, idx) => {
         const age = time - strike.createdAt;
         strike.opacity = Math.max(0, 1 - age / 20);
-
         if (strike.opacity > 0) {
-          strike.branches.forEach(branch => {
-            ctx.strokeStyle = `rgba(200, 220, 255, ${strike.opacity})`;
+          strike.branches.forEach(b => {
+            ctx.strokeStyle = `rgba(200,220,255,${strike.opacity})`;
             ctx.lineWidth = 3;
             ctx.shadowBlur = 20;
-            ctx.shadowColor = 'rgba(150, 200, 255, 0.8)';
-            
+            ctx.shadowColor = 'rgba(150,200,255,0.8)';
             ctx.beginPath();
-            ctx.moveTo(branch.points[0].x, branch.points[0].y);
-            for (let i = 1; i < branch.points.length; i++) {
-              ctx.lineTo(branch.points[i].x, branch.points[i].y);
-            }
+            ctx.moveTo(b.points[0].x, b.points[0].y);
+            for (let i = 1; i < b.points.length; i++) ctx.lineTo(b.points[i].x, b.points[i].y);
             ctx.stroke();
             ctx.shadowBlur = 0;
           });
         }
+        if (strike.opacity <= 0) lightningStrikes.splice(idx, 1);
       });
-
-      lightningStrikes.forEach((strike, idx) => {
-        if (strike.opacity <= 0) {
-          lightningStrikes.splice(idx, 1);
-        }
-      });
-
-      if (weatherMode === 'storm' && Math.random() > 0.995) {
-        createLightning(Math.random() * canvas.width, Math.random() * canvas.height * 0.6);
-      }
+      if (weatherMode === 'storm' && Math.random() > 0.995)
+        createLightning(rand(0, canvas.width), rand(0, canvas.height * 0.6));
 
       animationId = requestAnimationFrame(animate);
-    };
+    }
 
     animate();
 
     return () => {
       cancelAnimationFrame(animationId);
       window.removeEventListener('resize', resize);
-      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mousemove', handleMove);
       canvas.removeEventListener('click', handleClick);
     };
   }, [rainProbability, temperature, season, hourlyData]);
 
-  // Don't render canvas if no data
-  if (rainProbability === null) {
-    return null;
-  }
+  /* 9.  Nothing to show until first analysis */
+  if (rainProbability === null) return null;
 
   return (
     <canvas

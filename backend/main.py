@@ -109,31 +109,140 @@ def fetch_nasa_power_data(lat: float, lon: float, target_day_of_year: int):
         return None
 
 # ------------------------------------------------------------------
-# 5B. PREDICTIVE HOURLY MODEL using historical same-date patterns
+# 5B. ACCURATE SEASON DETERMINATION using climate zones
 # ------------------------------------------------------------------
-def determine_season(month: int, lat: float):
-    """Determine season based on month and hemisphere"""
-    # Northern hemisphere
-    if lat >= 0:
-        if month in [12, 1, 2]:
-            return "Winter"
-        elif month in [3, 4, 5]:
-            return "Spring"
-        elif month in [6, 7, 8]:
-            return "Summer"
+def determine_season(month: int, lat: float, lon: float):
+    """
+    Determine season based on climate zones and geographical patterns.
+    More accurate than simple hemisphere division.
+    """
+    
+    # Tropical Zone (-23.5° to 23.5°)
+    if -23.5 <= lat <= 23.5:
+        # Indian Subcontinent Monsoon (65°E to 95°E, 5°N to 30°N)
+        if 65 <= lon <= 95 and 5 <= lat <= 30:
+            if month in [6, 7, 8, 9]:
+                return "Monsoon"
+            elif month in [10, 11]:
+                return "Post-Monsoon"
+            elif month in [12, 1, 2]:
+                return "Winter"
+            else:  # [3, 4, 5]
+                return "Summer"
+        
+        # Southeast Asia Monsoon (95°E to 145°E, -10°S to 25°N)
+        elif 95 <= lon <= 145 and -10 <= lat <= 25:
+            if month in [5, 6, 7, 8, 9, 10]:
+                return "Wet Season"
+            else:
+                return "Dry Season"
+        
+        # East Africa (25°E to 55°E, -10°S to 10°N)
+        elif 25 <= lon <= 55 and -10 <= lat <= 10:
+            if month in [3, 4, 5]:
+                return "Long Rains"
+            elif month in [10, 11, 12]:
+                return "Short Rains"
+            elif month in [1, 2]:
+                return "Dry Season"
+            else:
+                return "Hot Dry Season"
+        
+        # Caribbean/Central America (-95°W to -60°W, 5°N to 25°N)
+        elif -95 <= lon <= -60 and 5 <= lat <= 25:
+            if month in [6, 7, 8, 9, 10, 11]:
+                return "Wet Season"
+            else:
+                return "Dry Season"
+        
+        # Amazon Basin (-80°W to -45°W, -10°S to 5°N)
+        elif -80 <= lon <= -45 and -10 <= lat <= 5:
+            if month in [12, 1, 2, 3, 4, 5]:
+                return "Wet Season"
+            else:
+                return "Dry Season"
+        
+        # Australia Tropical North (110°E to 155°E, -25°S to -10°S)
+        elif 110 <= lon <= 155 and -25 <= lat <= -10:
+            if month in [12, 1, 2, 3]:
+                return "Wet Season"
+            else:
+                return "Dry Season"
+        
+        # General Tropical fallback
         else:
-            return "Autumn"
-    # Southern hemisphere (reversed)
+            if (lat > 0 and month in [5, 6, 7, 8, 9, 10]) or \
+               (lat < 0 and month in [11, 12, 1, 2, 3, 4]):
+                return "Wet Season"
+            else:
+                return "Dry Season"
+    
+    # Subtropical Zone (23.5° to 35° and -23.5° to -35°)
+    elif 23.5 < abs(lat) <= 35:
+        if lat > 0:  # Northern Subtropical
+            if month in [12, 1, 2]:
+                return "Winter"
+            elif month in [3, 4, 5]:
+                return "Spring"
+            elif month in [6, 7, 8]:
+                return "Summer"
+            else:  # [9, 10, 11]
+                return "Autumn"
+        else:  # Southern Subtropical
+            if month in [6, 7, 8]:
+                return "Winter"
+            elif month in [9, 10, 11]:
+                return "Spring"
+            elif month in [12, 1, 2]:
+                return "Summer"
+            else:  # [3, 4, 5]
+                return "Autumn"
+    
+    # Temperate Zone (35° to 66.5° and -35° to -66.5°)
+    elif 35 < abs(lat) <= 66.5:
+        if lat > 0:  # Northern Temperate
+            if month in [12, 1, 2]:
+                return "Winter"
+            elif month in [3, 4, 5]:
+                return "Spring"
+            elif month in [6, 7, 8]:
+                return "Summer"
+            else:  # [9, 10, 11]
+                return "Autumn"
+        else:  # Southern Temperate
+            if month in [6, 7, 8]:
+                return "Winter"
+            elif month in [9, 10, 11]:
+                return "Spring"
+            elif month in [12, 1, 2]:
+                return "Summer"
+            else:  # [3, 4, 5]
+                return "Autumn"
+    
+    # Polar Zone (above 66.5° and below -66.5°)
     else:
-        if month in [12, 1, 2]:
-            return "Summer"
-        elif month in [3, 4, 5]:
-            return "Autumn"
-        elif month in [6, 7, 8]:
-            return "Winter"
-        else:
-            return "Spring"
+        if lat > 0:  # Northern Polar
+            if month in [11, 12, 1, 2, 3]:
+                return "Polar Night/Winter"
+            elif month in [4, 5]:
+                return "Spring"
+            elif month in [6, 7, 8]:
+                return "Midnight Sun/Summer"
+            else:  # [9, 10]
+                return "Autumn"
+        else:  # Southern Polar (Antarctica)
+            if month in [5, 6, 7, 8, 9]:
+                return "Polar Night/Winter"
+            elif month in [10, 11]:
+                return "Spring"
+            elif month in [12, 1, 2]:
+                return "Midnight Sun/Summer"
+            else:  # [3, 4]
+                return "Autumn"
 
+# ------------------------------------------------------------------
+# 5C. PREDICTIVE HOURLY MODEL using historical same-date patterns
+# ------------------------------------------------------------------
 def fetch_historical_hourly_data(lat: float, lon: float, target_date: date, years_back: int = 20):
     """
     Fetch hourly data for the same date across previous years.
@@ -307,8 +416,8 @@ def predict_future_hourly(lat: float, lon: float, target_date: date):
                 "predicted": True
             })
         
-        # Determine season
-        season = determine_season(target_date.month, lat)
+        # Determine season using accurate method
+        season = determine_season(target_date.month, lat, lon)
         
         return {
             "hourly_data": hourly_data,
@@ -361,7 +470,8 @@ def fetch_actual_hourly_data(lat: float, lon: float, target_date: date):
                 "predicted": False
             })
         
-        season = determine_season(target_date.month, lat)
+        # Determine season using accurate method
+        season = determine_season(target_date.month, lat, lon)
         
         return {
             "hourly_data": hourly_data,
@@ -482,7 +592,7 @@ def analyze_location_weather(lat: float, lon: float, target_date: date):
         response.update(hourly_result)
     else:
         response["hourly_data"] = None
-        response["season"] = determine_season(target_date.month, lat)
+        response["season"] = determine_season(target_date.month, lat, lon)
     
     return response
 
