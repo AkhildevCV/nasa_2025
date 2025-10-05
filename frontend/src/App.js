@@ -18,28 +18,40 @@ import InteractiveWeatherBackground from './components/Background';
 
 const API_URL = 'http://127.0.0.1:8000';
 
+/* ================================================================== */
+/* APP COMPONENT                                                      */
+/* ================================================================== */
+
 function App() {
   const [isPageLoading, setIsPageLoading] = useState(true);
-  const [date, setDate] = useState('2025-10-04');
-  const [viewMode, setViewMode] = useState('daily'); // 'daily' or 'hourly'
+  const [date, setDate] = useState('');
+  const [viewMode, setViewMode] = useState('daily');
 
-  /* -----------  DEFAULT CENTRE – map visible immediately  ----------- */
+  /* -----------  DEFAULT MAP CENTRE  ----------- */
   const [lat, setLat] = useState(20.0);
   const [lon, setLon] = useState(0.0);
-
   const [zoom, setZoom] = useState(10);
   const [address, setAddress] = useState(null);
-  const [searchQuery, setSearchQuery] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
   const [results, setResults] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
   const resultsRef = useRef(null);
   const mainContentRef = useRef(null);
+  const dateInputRef = useRef(null);
 
   const [mapRef, mapInView] = useInView({ threshold: 0.3, triggerOnce: true });
   const [controlsRef, controlsInView] = useInView({ threshold: 0.3, triggerOnce: true });
   const [metricsRef, metricsInView] = useInView({ threshold: 0.3, triggerOnce: true });
   const [chartsRef, chartsInView] = useInView({ threshold: 0.2, triggerOnce: true });
+
+  /* -------------------  VALIDATION LOGIC  ------------------------- */
+  const locationIsReady = Boolean(
+    (searchQuery && searchQuery.trim()) || (String(lat).trim() !== '' && String(lon).trim() !== '')
+  );
+  const formIsComplete = locationIsReady && date;
+  /* ------------------------------------------------------------------ */
 
   useEffect(() => {
     const t = setTimeout(() => setIsPageLoading(false), 2500);
@@ -49,7 +61,7 @@ function App() {
   const handleHeroAnimationComplete = useCallback(() => {
     setTimeout(() => {
       mainContentRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, 1500);
+    }, 2500);
   }, []);
 
   const getAddressFromCoords = useCallback(async (lt, ln) => {
@@ -85,6 +97,7 @@ function App() {
   };
 
   const handleAnalysis = async () => {
+    if (!formIsComplete) return;
     setLoading(true);
     setError('');
     setResults(null);
@@ -95,7 +108,6 @@ function App() {
         target_date: date,
       });
       setResults(data);
-      console.log('Analysis results:', data); // Debug log
       setTimeout(() => resultsRef.current?.scrollIntoView({ behavior: 'smooth' }), 600);
     } catch (err) {
       setError(err.response?.data?.detail || 'Backend connection failed.');
@@ -109,7 +121,26 @@ function App() {
     setViewMode('daily');
   };
 
-  // Check if hourly data is available and valid
+  const handleDateWrapperClick = () => {
+    dateInputRef.current?.showPicker?.();
+  };
+    
+  // *** NEW FEATURE: DYNAMIC TOOLTIP FOR THE ANALYSE BUTTON ***
+  const getButtonTooltip = () => {
+    if (loading) return "Analysis in progress...";
+    if (formIsComplete) return "Start weather analysis";
+    if (!locationIsReady && !date) {
+        return "Please enter a location and select a date";
+    }
+    if (!locationIsReady) {
+        return "Please enter a location to proceed";
+    }
+    if (!date) {
+        return "Please select a date to proceed";
+    }
+    return ""; // Default case
+  };
+
   const hasHourlyData = results?.hourly_data && Array.isArray(results.hourly_data) && results.hourly_data.length > 0;
 
   /* ------------------------------------------------------------------ */
@@ -127,8 +158,7 @@ function App() {
           animate={{ opacity: 1 }}
           className="app-shell"
         >
-          {/* Interactive Weather Background */}
-          <InteractiveWeatherBackground 
+          <InteractiveWeatherBackground
             rainProbability={results?.stats?.ml_rain_probability}
             temperature={results?.stats?.projected_temp_max}
             precipitation={results?.stats?.projected_precip}
@@ -155,7 +185,7 @@ function App() {
                   onZoomChange={handleZoomChange}
                 />
                 <div className="location-bar">
-                  <span className="pin">📍</span> {address ?? 'Unknown location'}
+                  <span className="pin">📍</span> {address ?? 'Select a location'}
                 </div>
               </GlassCard>
             </motion.div>
@@ -169,7 +199,7 @@ function App() {
               <GlassCard className="controls-card">
                 <form onSubmit={handleSearch} className="search-line">
                   <input
-                    value={searchQuery ?? ''}
+                    value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     placeholder="Search for a place…"
                   />
@@ -177,6 +207,7 @@ function App() {
                     Search
                   </MagneticButton>
                 </form>
+
                 <div className="coord-line">
                   <input
                     type="number"
@@ -185,6 +216,7 @@ function App() {
                     onChange={(e) => setLat(e.target.value)}
                     onBlur={() => getAddressFromCoords(lat, lon)}
                     placeholder="Latitude"
+                    className="no-spin"
                   />
                   <input
                     type="number"
@@ -193,13 +225,30 @@ function App() {
                     onChange={(e) => setLon(e.target.value)}
                     onBlur={() => getAddressFromCoords(lat, lon)}
                     placeholder="Longitude"
+                    className="no-spin"
                   />
                 </div>
+
                 <div className="analysis-line">
-                  <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
-                  <MagneticButton onClick={handleAnalysis} disabled={loading}>
-                    {loading ? 'Analysing…' : 'Analyse'}
-                  </MagneticButton>
+                  <div 
+                    className="date-wrapper" 
+                    onClick={handleDateWrapperClick}
+                    data-date-selected={!!date}
+                  >
+                    <input
+                      ref={dateInputRef}
+                      type="date"
+                      value={date}
+                      onChange={(e) => setDate(e.target.value)}
+                      className="stunning-date"
+                    />
+                  </div>
+                   {/* This wrapper provides the tooltip */}
+                  <div className="button-wrapper" title={getButtonTooltip()}>
+                    <MagneticButton onClick={handleAnalysis} disabled={!formIsComplete || loading}>
+                      {loading ? 'Analysing…' : 'Analyse'}
+                    </MagneticButton>
+                  </div>
                   {results && (
                     <motion.button
                       initial={{ width: 0, opacity: 0 }}
@@ -216,6 +265,10 @@ function App() {
             </motion.div>
 
             {error && <ErrorBanner msg={error} onDismiss={() => setError('')} />}
+            
+            <AnimatePresence>
+              {loading && <AnalysisLoader />}
+            </AnimatePresence>
 
             <AnimatePresence>
               {results && (
@@ -226,7 +279,6 @@ function App() {
                   exit={{ opacity: 0, y: 60 }}
                   className="results-area"
                 >
-                  {/* VIEW MODE TOGGLE */}
                   <motion.div
                     initial={{ opacity: 0, scale: 0.9 }}
                     animate={{ opacity: 1, scale: 1 }}
@@ -246,16 +298,14 @@ function App() {
                           className={`toggle-btn ${viewMode === 'hourly' ? 'active' : ''}`}
                           onClick={() => setViewMode('hourly')}
                           disabled={!hasHourlyData}
-                          title={!hasHourlyData ? 'Hourly data not available for this date' : ''}
+                          title={!hasHourlyData ? 'Hourly data not available' : ''}
                         >
                           <span className="toggle-icon">⏰</span>
                           Hourly Breakdown
                         </button>
                         <motion.div
                           className="toggle-slider"
-                          animate={{
-                            x: viewMode === 'hourly' ? '100%' : '0%'
-                          }}
+                          animate={{ x: viewMode === 'hourly' ? '100%' : '0%' }}
                           transition={{ type: 'spring', stiffness: 300, damping: 30 }}
                         />
                       </div>
@@ -267,7 +317,6 @@ function App() {
                     </GlassCard>
                   </motion.div>
 
-                  {/* ANIMATED CONTENT SWITCH */}
                   <AnimatePresence mode="wait">
                     {viewMode === 'daily' ? (
                       <motion.div
@@ -348,8 +397,8 @@ function App() {
                         transition={{ duration: 0.5, ease: 'easeInOut' }}
                       >
                         {hasHourlyData ? (
-                          <HourlyWeatherChart 
-                            data={results.hourly_data} 
+                          <HourlyWeatherChart
+                            data={results.hourly_data}
                             targetDate={date}
                             season={results.season}
                             predictionMethod={results.prediction_method}
@@ -377,16 +426,16 @@ function App() {
   );
 }
 
-/* ------------------------------------------------------------------ */
-/* ----------------------------  METRIC  ---------------------------- */
-/* ------------------------------------------------------------------ */
+/* ================================================================== */
+/* OTHER COMPONENTS                                                   */
+/* ================================================================== */
 
 function Metric({ label, value, unit, decimals = 1, delta, help }) {
   return (
     <div className="metric">
       <h3>{label}</h3>
       <p>
-        <AnimatedCounter to={value} decimals={decimals} />
+        <AnimatedCounter to={value || 0} decimals={decimals} />
         {unit}
       </p>
       {delta && <span className="delta">{delta}</span>}
@@ -394,10 +443,6 @@ function Metric({ label, value, unit, decimals = 1, delta, help }) {
     </div>
   );
 }
-
-/* ------------------------------------------------------------------ */
-/* --------------------------  ERROR BANNER  ------------------------ */
-/* ------------------------------------------------------------------ */
 
 function ErrorBanner({ msg, onDismiss }) {
   return (
@@ -409,6 +454,22 @@ function ErrorBanner({ msg, onDismiss }) {
     >
       {msg}
       <button onClick={onDismiss}>✕</button>
+    </motion.div>
+  );
+}
+
+function AnalysisLoader() {
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="analysis-loader-overlay"
+    >
+      <div className="analysis-loader-box">
+        <div className="analysis-loader-spinner" />
+        <p>Analyzing weather patterns…</p>
+      </div>
     </motion.div>
   );
 }

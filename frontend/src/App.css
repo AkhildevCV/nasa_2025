@@ -666,6 +666,147 @@ button:active::after {
   box-shadow: 0 0 20px rgba(38, 241, 127, 0.2);
 }
 
+/* ----- remove native date icon ----- */
+.stunning-date::-webkit-calendar-picker-indicator { display:none; }
+.stunning-date { appearance:none; -webkit-appearance:none; }
+
+/* ----- remove spinners on number fields ----- */
+.no-spin::-webkit-inner-spin-button,
+.no-spin::-webkit-outer-spin-button { -webkit-appearance:none; margin:0; }
+.no-spin { -moz-appearance:textfield; }
+
+/* ----- gorgeous date wrapper ----- */
+.date-wrapper{ position:relative; display:inline-block; }
+.date-wrapper::after{            /* custom calendar icon */
+  content:"📅"; position:absolute; right:0.75rem; top:50%;
+  transform:translateY(-50%); pointer-events:none; font-size:1.1rem;
+}
+
+/* ----- beautiful analysis loader ----- */
+.analysis-loader-overlay{
+  position:fixed; inset:0; z-index:9999;
+  background:rgba(0,0,0,.45);
+  backdrop-filter:blur(6px);
+  display:flex; align-items:center; justify-content:center;
+}
+.analysis-loader-box{
+  background:#0b0a0a; border-radius:16px; padding:2.2rem 3rem;
+  text-align:center; box-shadow:0 12px 40px rgba(0,0,0,.18);
+}
+.analysis-loader-spinner{
+  width:50px; height:50px; border:4px solid #e0e0e0;
+  border-top-color:#3f51b5; border-radius:50%;
+  animation:spin 1s linear infinite; margin:0 auto 1rem;
+}
+
+/* ================================================================== */
+/* NEW STYLES TO ADD                            */
+/* ================================================================== */
+
+/* --- Analysis Loading Screen --- */
+.analysis-loader-overlay {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(10, 20, 30, 0.8);
+  backdrop-filter: blur(10px);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.analysis-loader-box {
+  text-align: center;
+  color: #e2e8f0;
+}
+
+.analysis-loader-box p {
+  margin-top: 1.5rem;
+  font-size: 1.1rem;
+  letter-spacing: 0.05em;
+  font-weight: 500;
+}
+
+.analysis-loader-spinner {
+  width: 60px;
+  height: 60px;
+  border: 5px solid rgba(139, 92, 246, 0.2);
+  border-top-color: #a78bfa;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin: 0 auto;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* --- Stunning Date Input --- */
+.date-wrapper {
+  position: relative;
+  cursor: pointer;
+  flex-grow: 1; /* Allows it to take available space */
+}
+
+.stunning-date {
+  background-color: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  color: #e2e8f0;
+  font-family: inherit;
+  font-size: 1rem;
+  width: 100%;
+  box-sizing: border-box;
+  transition: all 0.2s ease-in-out;
+  position: relative;
+  z-index: 1;
+}
+
+.stunning-date:focus {
+  outline: none;
+  border-color: #a78bfa;
+  box-shadow: 0 0 15px rgba(167, 139, 250, 0.5);
+}
+
+/* Hide the default calendar icon */
+.stunning-date::-webkit-calendar-picker-indicator {
+  display: none;
+  -webkit-appearance: none;
+}
+
+/* Custom placeholder text using a pseudo-element on the wrapper */
+.date-wrapper::before {
+  
+    position: absolute;
+    top: 50%;
+    left: 1rem;
+    transform: translateY(-50%);
+    color: rgba(255, 255, 255, 0.4);
+    pointer-events: none; /* Important: allows clicks to pass through */
+    transition: opacity 0.2s ease;
+    z-index: 2;
+}
+
+/* Hide the custom placeholder when a date is selected */
+.date-wrapper[data-date-selected="true"]::before {
+    opacity: 0;
+}
+
+
+/* --- No Spin Buttons on Number Inputs --- */
+.no-spin {
+  -moz-appearance: textfield; /* Firefox */
+}
+.no-spin::-webkit-outer-spin-button,
+.no-spin::-webkit-inner-spin-button {
+  -webkit-appearance: none; /* Safari, Chrome, Edge, Opera */
+  margin: 0;
+}
+
+@keyframes spin{ to{ transform:rotate(360deg); } }
 
 @media (max-width: 900px) {
   .charts-grid {

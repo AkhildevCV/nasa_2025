@@ -6,7 +6,7 @@ const contributors = [
   { name: 'AKHILDEV C VASUDEVAN', github: 'AkhildevCV', color: '#22d3ee', icon: '🌟' },
   { name: 'ALVIN N S', github: 'alvinns', color: '#a78bfa', icon: '⚡' },
   { name: 'ANWIN K SUNNY', github: 'anwinksunny', color: '#f472b6', icon: '🚀' },
-  { name: 'ADAM FELANSO SIJO', github: 'friend3username', color: '#fb923c', icon: '💫' },
+  { name: 'ADAM FELANSO SIJO', github: 'felanso-777', color: '#fb923c', icon: '💫' },
 ];
 
 function Hero({ onAnimationComplete }) {
